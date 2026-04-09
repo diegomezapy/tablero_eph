@@ -1,0 +1,66 @@
+{
+  "years": [
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "departments": {
+    "0": "Asunción",
+    "1": "Concepción",
+    "2": "San Pedro",
+    "3": "Cordillera",
+    "4": "Guairá",
+    "5": "Caaguazú",
+    "6": "Caazapá",
+    "7": "Itapúa",
+    "8": "Misiones",
+    "9": "Paraguarí",
+    "10": "Alto Paraná",
+    "11": "Central",
+    "12": "Ñeembucú",
+    "13": "Amambay",
+    "14": "Canindeyú",
+    "15": "Pte. Hayes"
+  },
+  "areas": {
+    "1": "Urbana",
+    "6": "Rural"
+  },
+  "sex": {
+    "1": "Hombre",
+    "6": "Mujer"
+  },
+  "age_groups": [
+    "0-14",
+    "15-24",
+    "25-34",
+    "35-44",
+    "45-54",
+    "55-64",
+    "65+"
+  ],
+  "poverty_levels": {
+    "1": "Pobreza extrema",
+    "2": "Pobreza no extrema",
+    "3": "No pobre"
+  },
+  "cate_pea": {
+    "1": "Empleado/a público",
+    "2": "Empleado/a privado",
+    "3": "Empleador/a",
+    "4": "Cuenta propia",
+    "5": "Familiar no remunerado",
+    "6": "Empleado/a doméstico"
+  },
+  "rama_pea": {
+    "1": "Agricultura",
+    "2": "Industria",
+    "3": "Electricidad/agua",
+    "4": "Construcción",
+    "5": "Comercio/hoteles",
+    "6": "Transporte/comunicaciones",
+    "7": "Finanzas/seguros",
+    "8": "Serv. comunales/sociales"
+  }
+}

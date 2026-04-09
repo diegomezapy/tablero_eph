@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tablero EPHC - Paraguay</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="css/dashboard.css" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loading" class="loading-overlay">
+    <div class="text-center">
+      <div class="spinner-border text-primary" style="width:3rem;height:3rem" role="status"></div>
+      <p class="mt-3 text-muted">Cargando datos EPHC...</p>
+    </div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top" style="height:64px">
+    <div class="container-fluid">
+      <button id="sidebar-toggle" class="btn btn-outline-light d-lg-none me-2"><i class="bi bi-list"></i></button>
+      <a class="navbar-brand" href="#">
+        <i class="bi bi-bar-chart-line me-2"></i>Tablero EPHC Paraguay
+      </a>
+      <div class="d-flex align-items-center gap-1">
+        <button class="btn btn-sm year-btn btn-outline-light" data-year="2022">2022</button>
+        <button class="btn btn-sm year-btn btn-outline-light" data-year="2023">2023</button>
+        <button class="btn btn-sm year-btn btn-outline-light" data-year="2024">2024</button>
+        <button class="btn btn-sm year-btn active btn-primary" data-year="2025">2025</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main-wrapper">
+    <!-- Sidebar Filters -->
+    <aside class="sidebar">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0"><i class="bi bi-funnel me-1"></i>Filtros</h6>
+        <button id="btn-clear" class="btn-clear-filters">Limpiar</button>
+      </div>
+      <span id="filter-badge" class="filter-badge">Sin filtros</span>
+
+      <div class="filter-group">
+        <label for="filter-dpto">Departamento</label>
+        <select id="filter-dpto" class="form-select form-select-sm"></select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-area">Area</label>
+        <select id="filter-area" class="form-select form-select-sm"></select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-sex">Sexo</label>
+        <select id="filter-sex" class="form-select form-select-sm"></select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-age_group">Grupo de edad</label>
+        <select id="filter-age_group" class="form-select form-select-sm"></select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-poverty">Nivel de pobreza</label>
+        <select id="filter-poverty" class="form-select form-select-sm"></select>
+      </div>
+
+      <hr>
+      <p class="text-muted" style="font-size:0.7rem">
+        <i class="bi bi-info-circle me-1"></i>
+        Se permiten hasta 2 filtros simultáneos (además del año).
+      </p>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="content-area">
+      <!-- KPI Cards -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-2">
+          <div class="kpi-card" id="kpi-poverty">
+            <div class="kpi-label">Pobreza Total</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-trend-container"></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="kpi-card" id="kpi-extreme">
+            <div class="kpi-label">Pobreza Extrema</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-trend-container"></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="kpi-card" id="kpi-employment">
+            <div class="kpi-label">Tasa de Empleo</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-trend-container"></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="kpi-card" id="kpi-informality">
+            <div class="kpi-label">Informalidad</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-trend-container"></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="kpi-card" id="kpi-income">
+            <div class="kpi-label">Ingreso Mediano</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-trend-container"></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="kpi-card" id="kpi-schooling">
+            <div class="kpi-label">Años Escolaridad</div>
+            <div class="kpi-value">--</div>
+            <div class="kpi-trend-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-poverty" data-theme="poverty">
+            <i class="bi bi-piggy-bank me-1"></i>Pobreza
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-employment" data-theme="employment">
+            <i class="bi bi-briefcase me-1"></i>Empleo
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-income" data-theme="income">
+            <i class="bi bi-cash-stack me-1"></i>Ingresos
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-education" data-theme="education">
+            <i class="bi bi-mortarboard me-1"></i>Educación
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-housing" data-theme="housing">
+            <i class="bi bi-house me-1"></i>Vivienda
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-map" data-theme="map">
+            <i class="bi bi-geo-alt me-1"></i>Mapa
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-demographics" data-theme="demographics">
+            <i class="bi bi-people me-1"></i>Demografía
+          </button>
+        </li>
+      </ul>
+
+      <!-- Tab Content -->
+      <div class="tab-content">
+
+        <!-- POVERTY TAB -->
+        <div class="tab-pane fade show active" id="tab-poverty">
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <div class="chart-card">
+                <h6>Evolución de la pobreza 2022-2025</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-poverty-evolution"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="chart-card">
+                <h6>Composición de la pobreza</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-poverty-donut"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Pobreza por departamento</h6>
+                <div class="chart-container" style="height:400px"><canvas id="chart-poverty-dpto"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Pobreza por área</h6>
+                <div class="chart-container" style="height:400px"><canvas id="chart-poverty-area"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EMPLOYMENT TAB -->
+        <div class="tab-pane fade" id="tab-employment">
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <div class="chart-card">
+                <h6>Evolución empleo, informalidad y desempleo</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-emp-evolution"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="chart-card">
+                <h6>Categoría ocupacional</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-cate-pea"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Rama de actividad</h6>
+                <div class="chart-container" style="height:350px"><canvas id="chart-rama-pea"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Informalidad por departamento</h6>
+                <div class="chart-container" style="height:350px"><canvas id="chart-inf-dpto"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INCOME TAB -->
+        <div class="tab-pane fade" id="tab-income">
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <div class="chart-card">
+                <h6>Evolución del ingreso per cápita</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-inc-evolution"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="chart-card">
+                <h6>Distribución por quintil</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-inc-dist"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Ingreso medio por quintil</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-inc-quintile"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Ingreso medio por departamento</h6>
+                <div class="chart-container" style="height:400px"><canvas id="chart-inc-dpto"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EDUCATION TAB -->
+        <div class="tab-pane fade" id="tab-education">
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <div class="chart-card">
+                <h6>Evolución indicadores educativos</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-edu-evolution"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="chart-card">
+                <h6>Escolaridad por sexo</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-edu-sex"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Escolaridad por departamento</h6>
+                <div class="chart-container" style="height:400px"><canvas id="chart-edu-dpto"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>NiNi por área</h6>
+                <div class="chart-container" style="height:400px"><canvas id="chart-nini-area"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HOUSING TAB -->
+        <div class="tab-pane fade" id="tab-housing">
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Indicadores de vivienda y servicios</h6>
+                <div class="chart-container" style="height:400px"><canvas id="chart-housing-radar"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Urbana vs Rural</h6>
+                <div class="chart-container" style="height:400px"><canvas id="chart-housing-area"></canvas></div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="chart-card">
+                <h6>Evolución del hacinamiento</h6>
+                <div class="chart-container" style="height:250px"><canvas id="chart-housing-overcrowding"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MAP TAB -->
+        <div class="tab-pane fade" id="tab-map">
+          <div class="chart-card">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <h6 class="mb-0">Mapa departamental</h6>
+              <select id="mapIndicator" class="form-select form-select-sm" style="width:auto">
+                <option value="poverty_rate|poverty">Pobreza total</option>
+                <option value="extreme_poverty_rate|poverty">Pobreza extrema</option>
+                <option value="informality_rate|employment">Informalidad</option>
+                <option value="employment_rate|employment">Tasa de empleo</option>
+                <option value="mean_income|income">Ingreso medio</option>
+                <option value="mean_schooling|education">Años de escolaridad</option>
+                <option value="improved_water|housing">Agua mejorada</option>
+                <option value="improved_sanitation|housing">Saneamiento</option>
+              </select>
+            </div>
+            <div id="mapContainer"></div>
+            <p class="text-muted mt-2" style="font-size:0.75rem">
+              <i class="bi bi-hand-index me-1"></i>Haga clic en un departamento para filtrar los datos del tablero.
+            </p>
+          </div>
+        </div>
+
+        <!-- DEMOGRAPHICS TAB -->
+        <div class="tab-pane fade" id="tab-demographics">
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Pirámide poblacional</h6>
+                <div class="chart-container" style="height:350px"><canvas id="chart-pyramid"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Población urbana / rural</h6>
+                <div class="chart-container" style="height:350px"><canvas id="chart-urban"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Razón de dependencia</h6>
+                <div class="chart-container" style="height:300px"><canvas id="chart-dependency"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Tamaño medio del hogar por departamento</h6>
+                <div class="chart-container" style="height:400px"><canvas id="chart-hh-size"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /tab-content -->
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="dashboard-footer">
+    <strong>Fuente:</strong> Encuesta Permanente de Hogares Continua (EPHC) 2022-2025, INE Paraguay.
+    Los datos son estimaciones muestrales ponderadas. Celdas con n&lt;30 no se muestran.
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/filters.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
