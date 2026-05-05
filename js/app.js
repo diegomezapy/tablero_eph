@@ -2,6 +2,78 @@
 // app.js - Initialization, data loading, routing
 // ============================================================
 
+// ---- Multi-select widget ----
+function makeMultiSelectWidget(selectEl, dim) {
+  selectEl.style.display = 'none';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ms-wrap';
+  wrap.dataset.dim = dim;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ms-btn';
+  btn.innerHTML = '<span class="ms-display text-muted">Todos</span><i class="bi bi-chevron-down ms-arrow"></i>';
+
+  const panel = document.createElement('div');
+  panel.className = 'ms-panel';
+
+  Array.from(selectEl.options).slice(1).forEach(opt => {
+    const item = document.createElement('label');
+    item.className = 'ms-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = opt.value;
+    item.appendChild(cb);
+    item.appendChild(document.createTextNode(' ' + opt.text));
+    panel.appendChild(item);
+
+    cb.addEventListener('change', () => {
+      const selected = Array.from(panel.querySelectorAll('input:checked')).map(c => c.value);
+      updateMsDisplay(wrap, selected);
+      updateFilter(dim, selected);
+    });
+  });
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const wasOpen = wrap.classList.contains('open');
+    document.querySelectorAll('.ms-wrap.open').forEach(w => w.classList.remove('open'));
+    if (!wasOpen) wrap.classList.add('open');
+  });
+
+  wrap.appendChild(btn);
+  wrap.appendChild(panel);
+  selectEl.parentNode.insertBefore(wrap, selectEl);
+}
+
+function updateMsDisplay(wrap, selected) {
+  const btn = wrap.querySelector('.ms-btn');
+  const display = btn?.querySelector('.ms-display');
+  if (!display) return;
+  if (selected.length === 0) {
+    display.className = 'ms-display text-muted';
+    display.textContent = 'Todos';
+    btn.classList.remove('has-sel');
+  } else {
+    display.className = 'ms-display';
+    btn.classList.add('has-sel');
+    if (selected.length <= 2) {
+      const labels = selected.map(v => {
+        const cb = wrap.querySelector(`input[value="${CSS.escape(v)}"]`);
+        return cb?.parentElement?.textContent?.trim() || v;
+      });
+      display.innerHTML = labels.map(l => `<span class="ms-tag">${l}</span>`).join('');
+    } else {
+      display.innerHTML = `<span class="ms-sel-count">${selected.length} seleccionados</span>`;
+    }
+  }
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.ms-wrap.open').forEach(w => w.classList.remove('open'));
+});
+
 const dashboardData = {};
 const loadedThemes = new Set();
 
@@ -43,80 +115,32 @@ async function onTabChange(theme) {
   }
 }
 
+function buildSelect(id, entries) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Todos</option>';
+  entries.forEach(([k, v]) => { sel.innerHTML += `<option value="${k}">${v}</option>`; });
+}
+
 function populateFilters(metadata) {
   // Departments
-  const dptoSel = document.getElementById('filter-dpto');
-  if (dptoSel && metadata.departments) {
-    dptoSel.innerHTML = '<option value="">Todos</option>';
-    Object.entries(metadata.departments)
-      .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
-      .forEach(([k, v]) => {
-        dptoSel.innerHTML += `<option value="${k}">${v}</option>`;
-      });
+  if (metadata.departments) {
+    buildSelect('filter-dpto',
+      Object.entries(metadata.departments).sort((a, b) => parseInt(a[0]) - parseInt(b[0])));
   }
+  if (metadata.areas)         buildSelect('filter-area', Object.entries(metadata.areas));
+  if (metadata.sex)           buildSelect('filter-sex', Object.entries(metadata.sex));
+  if (metadata.age_groups)    buildSelect('filter-age_group', metadata.age_groups.map(ag => [ag, ag + ' años']));
+  if (metadata.poverty_levels) buildSelect('filter-poverty', Object.entries(metadata.poverty_levels));
+  if (metadata.condact)       buildSelect('filter-condact', Object.entries(metadata.condact));
+  if (metadata.cate_pea)      buildSelect('filter-cate_pea', Object.entries(metadata.cate_pea));
+  if (metadata.rama_pea)      buildSelect('filter-rama_pea', Object.entries(metadata.rama_pea));
 
-  // Area
-  const areaSel = document.getElementById('filter-area');
-  if (areaSel && metadata.areas) {
-    areaSel.innerHTML = '<option value="">Todas</option>';
-    Object.entries(metadata.areas).forEach(([k, v]) => {
-      areaSel.innerHTML += `<option value="${k}">${v}</option>`;
-    });
-  }
-
-  // Sex
-  const sexSel = document.getElementById('filter-sex');
-  if (sexSel && metadata.sex) {
-    sexSel.innerHTML = '<option value="">Todos</option>';
-    Object.entries(metadata.sex).forEach(([k, v]) => {
-      sexSel.innerHTML += `<option value="${k}">${v}</option>`;
-    });
-  }
-
-  // Age group
-  const ageSel = document.getElementById('filter-age_group');
-  if (ageSel && metadata.age_groups) {
-    ageSel.innerHTML = '<option value="">Todos</option>';
-    metadata.age_groups.forEach(ag => {
-      ageSel.innerHTML += `<option value="${ag}">${ag} años</option>`;
-    });
-  }
-
-  // Poverty
-  const povSel = document.getElementById('filter-poverty');
-  if (povSel && metadata.poverty_levels) {
-    povSel.innerHTML = '<option value="">Todos</option>';
-    Object.entries(metadata.poverty_levels).forEach(([k, v]) => {
-      povSel.innerHTML += `<option value="${k}">${v}</option>`;
-    });
-  }
-
-  // Condición de actividad
-  const condactSel = document.getElementById('filter-condact');
-  if (condactSel && metadata.condact) {
-    condactSel.innerHTML = '<option value="">Todos</option>';
-    Object.entries(metadata.condact).forEach(([k, v]) => {
-      condactSel.innerHTML += `<option value="${k}">${v}</option>`;
-    });
-  }
-
-  // Categoría ocupacional
-  const cateSel = document.getElementById('filter-cate_pea');
-  if (cateSel && metadata.cate_pea) {
-    cateSel.innerHTML = '<option value="">Todos</option>';
-    Object.entries(metadata.cate_pea).forEach(([k, v]) => {
-      cateSel.innerHTML += `<option value="${k}">${v}</option>`;
-    });
-  }
-
-  // Rama de actividad
-  const ramaSel = document.getElementById('filter-rama_pea');
-  if (ramaSel && metadata.rama_pea) {
-    ramaSel.innerHTML = '<option value="">Todos</option>';
-    Object.entries(metadata.rama_pea).forEach(([k, v]) => {
-      ramaSel.innerHTML += `<option value="${k}">${v}</option>`;
-    });
-  }
+  // Convert all filter selects to custom multi-select widgets
+  ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea'].forEach(dim => {
+    const sel = document.getElementById(`filter-${dim}`);
+    if (sel) makeMultiSelectWidget(sel, dim);
+  });
 }
 
 async function init() {
@@ -139,11 +163,7 @@ async function init() {
       loadTheme('demographics'),
     ]);
 
-    // Bind filter events
-    ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea'].forEach(dim => {
-      const el = document.getElementById(`filter-${dim}`);
-      if (el) el.addEventListener('change', () => updateFilter(dim, el.value));
-    });
+    // Filter events are wired inside makeMultiSelectWidget (called from populateFilters)
 
     // Year buttons
     document.querySelectorAll('.year-btn').forEach(btn => {

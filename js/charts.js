@@ -623,30 +623,12 @@ function drawWageCharts() {
 
   // --- 3. Evolution line (mean + median wages, respects all active filters) ---
   const tsMeanW = YEARS.map(y => {
-    const active = getActiveFilters();
-    const sorted = [...active].sort((a, b) => a.dim.localeCompare(b.dim));
-    let key, lookup;
-    if (sorted.length === 0) { key = 'year'; lookup = String(y); }
-    else {
-      key = 'year|' + sorted.map(f => f.dim).join('|');
-      lookup = y + '|' + sorted.map(f => f.val).join('|');
-    }
-    const entry = d.indicators?.mean_wage_age?.data?.[key]?.[lookup];
-    const val = entry?.v != null ? applyDeflation(entry.v, y) : null;
-    return { year: y, value: val };
+    const entry = _aggregateLookup(d.indicators?.mean_wage_age?.data, getActiveFilters(), y);
+    return { year: y, value: entry?.v != null ? applyDeflation(entry.v, y) : null };
   });
   const tsMedianW = YEARS.map(y => {
-    const active = getActiveFilters();
-    const sorted = [...active].sort((a, b) => a.dim.localeCompare(b.dim));
-    let key, lookup;
-    if (sorted.length === 0) { key = 'year'; lookup = String(y); }
-    else {
-      key = 'year|' + sorted.map(f => f.dim).join('|');
-      lookup = y + '|' + sorted.map(f => f.val).join('|');
-    }
-    const entry = d.indicators?.median_wage_age?.data?.[key]?.[lookup];
-    const val = entry?.v != null ? applyDeflation(entry.v, y) : null;
-    return { year: y, value: val };
+    const entry = _aggregateLookup(d.indicators?.median_wage_age?.data, getActiveFilters(), y);
+    return { year: y, value: entry?.v != null ? applyDeflation(entry.v, y) : null };
   });
 
   charts.wageEvol = destroyChart(charts.wageEvol);
@@ -879,6 +861,32 @@ function exportToExcel() {
     });
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsBrecha), 'Brecha_Salarial');
+
+  // ---- Sheet: Masa_Edad_Simple (wage mass + workers by individual age, sex, year, cate_pea) ----
+  const detailData = d.indicators?.wage_simple_age?.data;
+  if (detailData) {
+    const cateNames = { '0': 'Total ocupados', ...Object.fromEntries(Object.entries(meta?.cate_pea || {})) };
+    const rowsDet = [[
+      'Año', 'Edad simple', 'Sexo', 'Categoría ocupacional',
+      `Masa Salarial (${ipcNote})`, 'Trabajadores (ponderados)', 'N obs.',
+      `Ingreso Medio implícito (${ipcNote})`
+    ]];
+    Object.entries(detailData).sort((a, b) => {
+      const [ay, aa, as_, ac] = a[0].split('|').map(Number);
+      const [by, ba, bs, bc] = b[0].split('|').map(Number);
+      return ay - by || aa - ba || as_ - bs || ac - bc;
+    }).forEach(([k, v]) => {
+      const [yr, age, sex, cate] = k.split('|');
+      const sexLbl = sex === '1' ? 'Hombre' : 'Mujer';
+      const cateLbl = cateNames[cate] || `Cat ${cate}`;
+      const deflFac = deflate ? getIpcDeflator(parseInt(yr)) : 1;
+      const masa    = Math.round(v.masa * deflFac);
+      const workers = Math.round(v.w);
+      const mean    = workers > 0 ? Math.round(masa / workers) : '';
+      rowsDet.push([parseInt(yr), parseInt(age), sexLbl, cateLbl, masa, workers, v.n, mean]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsDet), 'Masa_Edad_Simple');
+  }
 
   // ---- Sheet: IPC_Deflactor ----
   const ipc = meta?.ipc || {};

@@ -416,6 +416,52 @@ def compute_income(reg02):
                           WAGE_DIMS, WAGE_CROSS)
     }
 
+    # ---- Masa salarial + trabajadores por edad simple, sexo, año, categoría ----
+    print("    Computing wage_simple_age detail...")
+    occ_det = occ[occ['P02'].notna() & occ['P06'].notna() & occ['CATE_PEA'].notna() & (occ['P02'] >= 10)].copy()
+    occ_det['masa_ind'] = occ_det['ipcm'] * occ_det['FACTOR']
+    occ_det['age_i']  = occ_det['P02'].astype(int)
+    occ_det['sex_i']  = occ_det['P06'].astype(int)
+    occ_det['cate_i'] = occ_det['CATE_PEA'].astype(int)
+
+    detail = {}
+    for y in YEARS:
+        sub = occ_det[occ_det['year'] == y]
+
+        # All categories combined (cate=0)
+        g_all = sub.groupby(['age_i', 'sex_i']).agg(
+            masa=('masa_ind', 'sum'),
+            workers=('FACTOR', 'sum'),
+            n_obs=('ipcm', 'count')
+        )
+        for (age, sex), row in g_all.iterrows():
+            if int(row['n_obs']) >= 5:
+                detail[f"{y}|{age}|{sex}|0"] = {
+                    "masa": int(round(row['masa'])),
+                    "w":    int(round(row['workers'])),
+                    "n":    int(row['n_obs'])
+                }
+
+        # By category
+        g_cat = sub.groupby(['age_i', 'sex_i', 'cate_i']).agg(
+            masa=('masa_ind', 'sum'),
+            workers=('FACTOR', 'sum'),
+            n_obs=('ipcm', 'count')
+        )
+        for (age, sex, cate), row in g_cat.iterrows():
+            if int(row['n_obs']) >= 5:
+                detail[f"{y}|{age}|{sex}|{cate}"] = {
+                    "masa": int(round(row['masa'])),
+                    "w":    int(round(row['workers'])),
+                    "n":    int(row['n_obs'])
+                }
+
+    indicators['wage_simple_age'] = {
+        'label': 'Masa salarial y trabajadores por edad simple',
+        'unit': 'Gs.',
+        'data': detail
+    }
+
     return {"indicators": indicators}
 
 
