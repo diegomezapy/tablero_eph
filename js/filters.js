@@ -8,13 +8,18 @@ const filterState = {
   area: null,
   sex: null,
   age_group: null,
-  poverty: null
+  poverty: null,
+  condact: null,
+  cate_pea: null,
+  rama_pea: null,
 };
 
 const YEARS = [2022, 2023, 2024, 2025];
 
+const ALL_FILTER_DIMS = ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea'];
+
 function getActiveFilters() {
-  return ['dpto', 'area', 'sex', 'age_group', 'poverty']
+  return ALL_FILTER_DIMS
     .filter(k => filterState[k] !== null)
     .map(k => ({ dim: k, val: filterState[k] }));
 }
@@ -47,7 +52,7 @@ function enforceMaxFilters(justChanged) {
 }
 
 function clearFilters() {
-  ['dpto', 'area', 'sex', 'age_group', 'poverty'].forEach(k => {
+  ALL_FILTER_DIMS.forEach(k => {
     filterState[k] = null;
     const el = document.getElementById(`filter-${k}`);
     if (el) el.value = '';
@@ -69,10 +74,10 @@ function updateFilterUI() {
     btn.classList.toggle('btn-outline-primary', parseInt(btn.dataset.year) !== filterState.year);
   });
 
-  // Disable filters not available for housing tab
+  // Disable person-level filters for housing tab (REG01 has no sex/age/condact/cate_pea/rama_pea)
   const isHousingTab = document.querySelector('#tab-housing.active') !== null ||
     document.querySelector('[data-bs-target="#tab-housing"].active') !== null;
-  ['sex', 'age_group'].forEach(dim => {
+  ['sex', 'age_group', 'condact', 'cate_pea', 'rama_pea'].forEach(dim => {
     const el = document.getElementById(`filter-${dim}`);
     if (el) {
       el.disabled = isHousingTab;
@@ -150,13 +155,16 @@ function lookupByDimension(themeData, indicatorId, dimName) {
 function getDimLabel(dim, val, metadata) {
   if (!metadata) return String(val);
   const map = {
-    'dpto': metadata.departments,
-    'area': metadata.areas,
-    'sex': metadata.sex,
-    'poverty': metadata.poverty_levels,
-    'age_group': null
+    'dpto':     metadata.departments,
+    'area':     metadata.areas,
+    'sex':      metadata.sex,
+    'poverty':  metadata.poverty_levels,
+    'condact':  metadata.condact,
+    'cate_pea': metadata.cate_pea,
+    'rama_pea': metadata.rama_pea,
+    'age_group': null,
   };
   if (dim === 'age_group') return String(val);
   const m = map[dim];
-  return m ? (m[String(val)] || String(val)) : String(val);
+  return m ? (m[String(Math.round(val))] || String(val)) : String(val);
 }

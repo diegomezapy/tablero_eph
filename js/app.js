@@ -90,6 +90,33 @@ function populateFilters(metadata) {
       povSel.innerHTML += `<option value="${k}">${v}</option>`;
     });
   }
+
+  // Condición de actividad
+  const condactSel = document.getElementById('filter-condact');
+  if (condactSel && metadata.condact) {
+    condactSel.innerHTML = '<option value="">Todos</option>';
+    Object.entries(metadata.condact).forEach(([k, v]) => {
+      condactSel.innerHTML += `<option value="${k}">${v}</option>`;
+    });
+  }
+
+  // Categoría ocupacional
+  const cateSel = document.getElementById('filter-cate_pea');
+  if (cateSel && metadata.cate_pea) {
+    cateSel.innerHTML = '<option value="">Todos</option>';
+    Object.entries(metadata.cate_pea).forEach(([k, v]) => {
+      cateSel.innerHTML += `<option value="${k}">${v}</option>`;
+    });
+  }
+
+  // Rama de actividad
+  const ramaSel = document.getElementById('filter-rama_pea');
+  if (ramaSel && metadata.rama_pea) {
+    ramaSel.innerHTML = '<option value="">Todos</option>';
+    Object.entries(metadata.rama_pea).forEach(([k, v]) => {
+      ramaSel.innerHTML += `<option value="${k}">${v}</option>`;
+    });
+  }
 }
 
 async function init() {
@@ -113,7 +140,7 @@ async function init() {
     ]);
 
     // Bind filter events
-    ['dpto', 'area', 'sex', 'age_group', 'poverty'].forEach(dim => {
+    ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea'].forEach(dim => {
       const el = document.getElementById(`filter-${dim}`);
       if (el) el.addEventListener('change', () => updateFilter(dim, el.value));
     });

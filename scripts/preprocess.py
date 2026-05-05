@@ -38,17 +38,36 @@ AGE_BINS = [-1, 14, 24, 34, 44, 54, 64, 200]
 AGE_LABELS = ["0-14", "15-24", "25-34", "35-44", "45-54", "55-64", "65+"]
 
 DIMENSIONS = {
-    'dpto':      {'col': 'DPTO',      'values': None},  # filled dynamically
-    'area':      {'col': 'AREA',      'values': [1, 6]},
-    'sex':       {'col': 'P06',       'values': [1, 6]},
-    'age_group': {'col': 'age_group', 'values': AGE_LABELS},
-    'poverty':   {'col': 'pobrezai',  'values': [1, 2, 3]},
+    'dpto':     {'col': 'DPTO',      'values': None},  # filled dynamically
+    'area':     {'col': 'AREA',      'values': [1, 6]},
+    'sex':      {'col': 'P06',       'values': [1, 6]},
+    'age_group':{'col': 'age_group', 'values': AGE_LABELS},
+    'poverty':  {'col': 'pobrezai',  'values': [1, 2, 3]},
+    'condact':  {'col': 'condact',   'values': [1, 2, 3]},
+    'cate_pea': {'col': 'CATE_PEA',  'values': [1, 2, 3, 4, 5, 6]},
+    'rama_pea': {'col': 'RAMA_PEA',  'values': [1, 2, 3, 4, 5, 6, 7, 8]},
 }
 
+# All pairs MUST be in alphabetical order (a-z) so keys match the JS buildKey() sort
 CROSS_TABS_2D = [
-    ('dpto', 'area'), ('dpto', 'sex'), ('area', 'sex'),
-    ('area', 'poverty'), ('sex', 'poverty'),
-    ('sex', 'age_group'), ('area', 'age_group'),
+    ('age_group', 'area'),
+    ('age_group', 'cate_pea'),
+    ('age_group', 'condact'),
+    ('age_group', 'rama_pea'),
+    ('age_group', 'sex'),
+    ('area', 'cate_pea'),
+    ('area', 'condact'),
+    ('area', 'dpto'),
+    ('area', 'poverty'),
+    ('area', 'rama_pea'),
+    ('area', 'sex'),
+    ('cate_pea', 'sex'),
+    ('condact', 'dpto'),
+    ('condact', 'poverty'),
+    ('condact', 'sex'),
+    ('dpto', 'sex'),
+    ('poverty', 'sex'),
+    ('rama_pea', 'sex'),
 ]
 
 # REG01 only has these dimensions
@@ -87,13 +106,20 @@ def load_reg02(year):
     # Ensure key columns are numeric
     for col in ['P02', 'P06', 'DPTO', 'AREA', 'pobrezai', 'pobnopoi',
                 'CATE_PEA', 'OCUP_PEA', 'RAMA_PEA', 'informalidad',
-                'quintili', 'decili', 'ED01', 'ED02']:
+                'quintili', 'decili', 'ED01', 'ED02', 'PEAA', 'PEAD', 'P03']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
     # Derived columns
     df['age_group'] = pd.cut(df['P02'], bins=AGE_BINS, labels=AGE_LABELS)
     df['year'] = year
+
+    # condact: economic activity status (10+ only)
+    # PEAA: 1=Ocupado, 2=Desocupado, 3=Inactivo, 9/NaN=N/A
+    if 'PEAA' in df.columns:
+        df['condact'] = df['PEAA'].map({1.0: 1, 2.0: 2, 3.0: 3})
+    else:
+        df['condact'] = np.nan
 
     print(f"    {len(df)} rows, weight col: FACTOR, mean={df['FACTOR'].mean():.1f}")
     return df
@@ -353,19 +379,30 @@ def compute_income(reg02):
     WAGE_DIMS = {
         'age_group': DIMENSIONS['age_group'],
         'area':      DIMENSIONS['area'],
-        'sex':       DIMENSIONS['sex'],
+        'cate_pea':  DIMENSIONS['cate_pea'],
+        'condact':   DIMENSIONS['condact'],
         'dpto':      DIMENSIONS['dpto'],
         'poverty':   DIMENSIONS['poverty'],
+        'rama_pea':  DIMENSIONS['rama_pea'],
+        'sex':       DIMENSIONS['sex'],
     }
     WAGE_CROSS = [
-        ('age_group', 'sex'),
         ('age_group', 'area'),
-        ('age_group', 'poverty'),
-        ('dpto', 'area'),
-        ('dpto', 'sex'),
-        ('area', 'sex'),
+        ('age_group', 'cate_pea'),
+        ('age_group', 'condact'),
+        ('age_group', 'rama_pea'),
+        ('age_group', 'sex'),
+        ('area', 'cate_pea'),
+        ('area', 'condact'),
+        ('area', 'dpto'),
         ('area', 'poverty'),
-        ('sex', 'poverty'),
+        ('area', 'rama_pea'),
+        ('area', 'sex'),
+        ('cate_pea', 'sex'),
+        ('condact', 'sex'),
+        ('dpto', 'sex'),
+        ('poverty', 'sex'),
+        ('rama_pea', 'sex'),
     ]
 
     indicators['mean_wage_age'] = {
@@ -601,6 +638,11 @@ def write_metadata(reg02):
             "1": "Agricultura", "2": "Industria", "3": "Electricidad/agua",
             "4": "Construcción", "5": "Comercio/hoteles", "6": "Transporte/comunicaciones",
             "7": "Finanzas/seguros", "8": "Serv. comunales/sociales"
+        },
+        "condact": {
+            "1": "Ocupado/a",
+            "2": "Desocupado/a",
+            "3": "Inactivo/a"
         },
         "ipc": {
             "base_year": 2022,

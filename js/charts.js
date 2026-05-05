@@ -725,87 +725,175 @@ function exportToExcel() {
   const wb = XLSX.utils.book_new();
   const deflate = deflateLabel();
   const baseYear = meta?.ipc?.base_year || 2022;
-  const ipcNote = deflate ? `Gs. constantes ${baseYear} (deflactado por IPC)` : 'Gs. corrientes';
+  const ipcNote = deflate ? `Gs. const. ${baseYear}` : 'Gs. corrientes';
 
-  // --- Sheet 1: Trayectoria por año y edad ---
-  const rows1 = [['Año', 'Grupo de Edad', `Ingreso Medio (${ipcNote})`, `Ingreso Mediano (${ipcNote})`]];
-  YEARS.forEach(y => {
-    WAGE_AGE_LABELS.forEach(ag => {
-      const em = d.indicators?.mean_wage_age?.data?.['year|age_group']?.[`${y}|${ag}`];
-      const emed = d.indicators?.median_wage_age?.data?.['year|age_group']?.[`${y}|${ag}`];
-      const vm = em?.v != null ? (deflate ? em.v * getIpcDeflator(y) : em.v) : null;
-      const vmed = emed?.v != null ? (deflate ? emed.v * getIpcDeflator(y) : emed.v) : null;
-      rows1.push([y, ag, vm != null ? Math.round(vm) : '', vmed != null ? Math.round(vmed) : '']);
-    });
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows1), 'Trayectoria_Edad');
+  // Helper: apply deflation
+  const defl = (v, y) => (v != null && deflate) ? Math.round(v * getIpcDeflator(y)) : (v != null ? Math.round(v) : '');
 
-  // --- Sheet 2: Trayectoria por año, edad y sexo ---
-  const rows2 = [['Año', 'Grupo de Edad', 'Sexo', `Ingreso Medio (${ipcNote})`]];
-  YEARS.forEach(y => {
-    WAGE_AGE_LABELS.forEach(ag => {
-      [[1, 'Hombre'], [6, 'Mujer']].forEach(([sx, slbl]) => {
-        const entry = d.indicators?.mean_wage_age?.data?.['year|age_group|sex']?.[`${y}|${ag}|${sx}`];
-        const val = entry?.v != null ? (deflate ? entry.v * getIpcDeflator(y) : entry.v) : null;
-        rows2.push([y, ag, slbl, val != null ? Math.round(val) : '']);
+  // Helper: get wage entry from cross-tab
+  const getW = (ind, crossKey, lookupKey) =>
+    d.indicators?.[ind]?.data?.[crossKey]?.[lookupKey];
+
+  // Helper: build a sheet for a single dimension breakdown
+  function sheetByDim(dimKey, dimLabels, crossTab) {
+    const header = ['Año', 'Categoría', `Ingreso Medio (${ipcNote})`, `Ingreso Mediano (${ipcNote})`, 'N obs.'];
+    const rows = [header];
+    YEARS.forEach(y => {
+      dimLabels.forEach(([k, label]) => {
+        const lookup = `${y}|${k}`;
+        const em = getW('mean_wage_age', crossTab, lookup);
+        const emed = getW('median_wage_age', crossTab, lookup);
+        rows.push([y, label, defl(em?.v, y), defl(emed?.v, y), em?.n ?? '']);
       });
     });
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows2), 'Trayectoria_Edad_Sexo');
+    return rows;
+  }
 
-  // --- Sheet 3: Brecha salarial (ratio H/M) ---
-  const rows3 = [['Año', 'Grupo de Edad', 'Ratio Hombre/Mujer', 'Ingreso Hombre', 'Ingreso Mujer']];
-  YEARS.forEach(y => {
-    WAGE_AGE_LABELS.forEach(ag => {
-      const em = d.indicators?.mean_wage_age?.data?.['year|age_group|sex']?.[`${y}|${ag}|1`];
-      const ef = d.indicators?.mean_wage_age?.data?.['year|age_group|sex']?.[`${y}|${ag}|6`];
-      const vm = em?.v != null ? (deflate ? em.v * getIpcDeflator(y) : em.v) : null;
-      const vf = ef?.v != null ? (deflate ? ef.v * getIpcDeflator(y) : ef.v) : null;
-      const ratio = vm != null && vf != null && vf > 0 ? parseFloat((vm / vf).toFixed(3)) : '';
-      rows3.push([y, ag, ratio, vm != null ? Math.round(vm) : '', vf != null ? Math.round(vf) : '']);
+  // Helper: build a sheet for two-dimension cross-tab
+  function sheetBy2Dims(dim1Labels, dim2Labels, crossTab, d1name, d2name) {
+    const header = ['Año', d1name, d2name, `Ingreso Medio (${ipcNote})`, `Ingreso Mediano (${ipcNote})`, 'N obs.'];
+    const rows = [header];
+    YEARS.forEach(y => {
+      dim1Labels.forEach(([k1, l1]) => {
+        dim2Labels.forEach(([k2, l2]) => {
+          // cross-tab key is alphabetically sorted in data
+          const lookup = `${y}|${k1}|${k2}`;
+          const em = getW('mean_wage_age', crossTab, lookup);
+          const emed = getW('median_wage_age', crossTab, lookup);
+          if (em || emed) {
+            rows.push([y, l1, l2, defl(em?.v, y), defl(emed?.v, y), em?.n ?? '']);
+          }
+        });
+      });
     });
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows3), 'Brecha_Salarial');
+    return rows;
+  }
 
-  // --- Sheet 4: Ingreso medio general (todos los filtros activos) ---
+  // Label maps
+  const ageLbls  = WAGE_AGE_LABELS.map(ag => [ag, ag + ' años']);
+  const sexLbls  = [[1, 'Hombre'], [6, 'Mujer']];
+  const areaLbls = [[1, 'Urbana'], [6, 'Rural']];
+  const condLbls = [[1, 'Ocupado/a'], [2, 'Desocupado/a'], [3, 'Inactivo/a']];
+  const cateLbls = Object.entries(meta?.cate_pea || {}).map(([k, v]) => [parseInt(k), v]);
+  const ramaLbls = Object.entries(meta?.rama_pea || {}).map(([k, v]) => [parseInt(k), v]);
+  const dptoLbls = Object.entries(meta?.departments || {}).map(([k, v]) => [parseInt(k), v]).sort((a,b)=>a[0]-b[0]);
+
+  // ---- Sheet: Serie_Anual (with active filters) ----
   const active = getActiveFilters();
   const filterDesc = active.length > 0
-    ? active.map(f => `${f.dim}=${f.val}`).join(', ')
+    ? active.map(f => `${getDimLabel(f.dim, f.val, meta)}`).join(' / ')
     : 'Sin filtros';
-  const rows4 = [
-    [`Filtros aplicados: ${filterDesc}`, '', '', ''],
-    ['Año', `Ingreso Medio (${ipcNote})`, `Ingreso Mediano (${ipcNote})`, 'N (observaciones)']
+  const rowsAnual = [
+    [`Filtros: ${filterDesc}`, '', '', ''],
+    ['Año', `Ingreso Medio (${ipcNote})`, `Ingreso Mediano (${ipcNote})`, 'N obs.']
   ];
   YEARS.forEach(y => {
     const sorted = [...active].sort((a, b) => a.dim.localeCompare(b.dim));
     let key, lookup;
     if (sorted.length === 0) { key = 'year'; lookup = String(y); }
-    else {
-      key = 'year|' + sorted.map(f => f.dim).join('|');
-      lookup = y + '|' + sorted.map(f => f.val).join('|');
-    }
-    const em = d.indicators?.mean_wage_age?.data?.[key]?.[lookup];
-    const emed = d.indicators?.median_wage_age?.data?.[key]?.[lookup];
-    const vm = em?.v != null ? (deflate ? em.v * getIpcDeflator(y) : em.v) : null;
-    const vmed = emed?.v != null ? (deflate ? emed.v * getIpcDeflator(y) : emed.v) : null;
-    rows4.push([y, vm != null ? Math.round(vm) : '', vmed != null ? Math.round(vmed) : '', em?.n ?? '']);
+    else { key = 'year|' + sorted.map(f => f.dim).join('|'); lookup = y + '|' + sorted.map(f => f.val).join('|'); }
+    const em = getW('mean_wage_age', key, lookup);
+    const emed = getW('median_wage_age', key, lookup);
+    rowsAnual.push([y, defl(em?.v, y), defl(emed?.v, y), em?.n ?? '']);
   });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows4), 'Serie_Anual');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsAnual), 'Serie_Anual');
 
-  // --- Sheet 5: IPC utilizado ---
+  // ---- Sheet: Por_Edad ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetByDim('age_group', ageLbls, 'year|age_group')), 'Por_Edad');
+
+  // ---- Sheet: Por_Sexo ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetByDim('sex', sexLbls, 'year|sex')), 'Por_Sexo');
+
+  // ---- Sheet: Por_Area ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetByDim('area', areaLbls, 'year|area')), 'Por_Area');
+
+  // ---- Sheet: Por_Departamento ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetByDim('dpto', dptoLbls, 'year|dpto')), 'Por_Departamento');
+
+  // ---- Sheet: Por_Condicion ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetByDim('condact', condLbls, 'year|condact')), 'Por_Condicion');
+
+  // ---- Sheet: Por_Categoria ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetByDim('cate_pea', cateLbls, 'year|cate_pea')), 'Por_Categoria');
+
+  // ---- Sheet: Por_Rama ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetByDim('rama_pea', ramaLbls, 'year|rama_pea')), 'Por_Rama');
+
+  // ---- Sheet: Edad_x_Sexo (age_group < sex alphabetically) ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(ageLbls, sexLbls, 'year|age_group|sex', 'Grupo Edad', 'Sexo')), 'Edad_x_Sexo');
+
+  // ---- Sheet: Edad_x_Area ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(ageLbls, areaLbls, 'year|age_group|area', 'Grupo Edad', 'Area')), 'Edad_x_Area');
+
+  // ---- Sheet: Edad_x_Condicion ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(ageLbls, condLbls, 'year|age_group|condact', 'Grupo Edad', 'Condición')), 'Edad_x_Condicion');
+
+  // ---- Sheet: Edad_x_Categoria ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(ageLbls, cateLbls, 'year|age_group|cate_pea', 'Grupo Edad', 'Categoría')), 'Edad_x_Categoria');
+
+  // ---- Sheet: Edad_x_Rama ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(ageLbls, ramaLbls, 'year|age_group|rama_pea', 'Grupo Edad', 'Rama')), 'Edad_x_Rama');
+
+  // ---- Sheet: Area_x_Sexo ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(areaLbls, sexLbls, 'year|area|sex', 'Área', 'Sexo')), 'Area_x_Sexo');
+
+  // ---- Sheet: Area_x_Categoria ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(areaLbls, cateLbls, 'year|area|cate_pea', 'Área', 'Categoría')), 'Area_x_Categoria');
+
+  // ---- Sheet: Area_x_Rama ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(areaLbls, ramaLbls, 'year|area|rama_pea', 'Área', 'Rama')), 'Area_x_Rama');
+
+  // ---- Sheet: Categoria_x_Sexo ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(cateLbls, sexLbls, 'year|cate_pea|sex', 'Categoría', 'Sexo')), 'Categoria_x_Sexo');
+
+  // ---- Sheet: Rama_x_Sexo ----
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(
+    sheetBy2Dims(ramaLbls, sexLbls, 'year|rama_pea|sex', 'Rama', 'Sexo')), 'Rama_x_Sexo');
+
+  // ---- Sheet: Brecha_Salarial (ratio H/M by year × age_group) ----
+  const rowsBrecha = [['Año', 'Grupo Edad', 'Ratio H/M', `Ingreso Hombre (${ipcNote})`, `Ingreso Mujer (${ipcNote})`]];
+  YEARS.forEach(y => {
+    WAGE_AGE_LABELS.forEach(ag => {
+      const em = getW('mean_wage_age', 'year|age_group|sex', `${y}|${ag}|1`);
+      const ef = getW('mean_wage_age', 'year|age_group|sex', `${y}|${ag}|6`);
+      const vm = em?.v != null ? (deflate ? em.v * getIpcDeflator(y) : em.v) : null;
+      const vf = ef?.v != null ? (deflate ? ef.v * getIpcDeflator(y) : ef.v) : null;
+      const ratio = vm != null && vf != null && vf > 0 ? parseFloat((vm / vf).toFixed(3)) : '';
+      rowsBrecha.push([y, ag, ratio, vm != null ? Math.round(vm) : '', vf != null ? Math.round(vf) : '']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsBrecha), 'Brecha_Salarial');
+
+  // ---- Sheet: IPC_Deflactor ----
   const ipc = meta?.ipc || {};
-  const rows5 = [
-    ['Fuente IPC:', ipc.note || 'BCP Paraguay'],
+  const rowsIpc = [
+    ['Fuente:', ipc.note || 'BCP Paraguay'],
     ['Año base:', String(ipc.base_year || 2022)],
     [],
     ['Año', 'IPC (promedio anual)', 'Factor deflactor (base=2022)']
   ];
   YEARS.forEach(y => {
-    const ipcVal = ipc[String(y)] || '';
-    const factor = ipc[String(y)] ? parseFloat((100 / ipc[String(y)]).toFixed(4)) : '';
-    rows5.push([y, ipcVal, factor]);
+    const iv = ipc[String(y)] || '';
+    const fac = iv ? parseFloat((100 / iv).toFixed(4)) : '';
+    rowsIpc.push([y, iv, fac]);
   });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows5), 'IPC_Deflactor');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsIpc), 'IPC_Deflactor');
 
   const fname = `trayectorias_salariales_EPHC_${new Date().toISOString().slice(0,10)}.xlsx`;
   XLSX.writeFile(wb, fname);

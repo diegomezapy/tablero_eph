@@ -63,6 +63,11 @@
     "7": "Finanzas/seguros",
     "8": "Serv. comunales/sociales"
   },
+  "condact": {
+    "1": "Ocupado/a",
+    "2": "Desocupado/a",
+    "3": "Inactivo/a"
+  },
   "ipc": {
     "base_year": 2022,
     "note": "IPC promedio anual Paraguay, base 2022=100. Fuente: BCP.",
