@@ -70,6 +70,30 @@ CROSS_TABS_2D = [
     ('rama_pea', 'sex'),
 ]
 
+# 3D cross-tabs (all dims sorted alphabetically to match JS key sort)
+CROSS_TABS_3D = [
+    ('age_group', 'area',     'sex'),
+    ('age_group', 'cate_pea', 'condact'),
+    ('age_group', 'cate_pea', 'sex'),
+    ('age_group', 'condact',  'sex'),
+    ('age_group', 'poverty',  'sex'),
+    ('area',      'cate_pea', 'sex'),
+    ('area',      'condact',  'sex'),
+    ('area',      'poverty',  'sex'),
+    ('cate_pea',  'condact',  'sex'),
+    ('condact',   'poverty',  'sex'),
+]
+
+WAGE_CROSS_3D = [
+    ('age_group', 'area',     'sex'),
+    ('age_group', 'cate_pea', 'condact'),
+    ('age_group', 'cate_pea', 'sex'),
+    ('age_group', 'condact',  'sex'),
+    ('area',      'cate_pea', 'sex'),
+    ('area',      'condact',  'sex'),
+    ('cate_pea',  'condact',  'sex'),
+]
+
 # REG01 only has these dimensions
 DIMS_REG01 = {
     'dpto':    {'col': 'DPTO',     'values': None},
@@ -192,7 +216,7 @@ def weighted_median(df, col, weight='FACTOR'):
     return round(float(sorted_df.loc[idx, col]), 2)
 
 
-def aggregate(df_all, compute_fn, dims_config, cross_tabs, weight='FACTOR', min_n=30):
+def aggregate(df_all, compute_fn, dims_config, cross_tabs, cross_tabs_3d=None, weight='FACTOR', min_n=30):
     result = {}
 
     # National by year
@@ -234,6 +258,32 @@ def aggregate(df_all, compute_fn, dims_config, cross_tabs, weight='FACTOR', min_
                         val = compute_fn(sub)
                         result[key][f"{y}|{v1}|{v2}"] = {"v": val, "n": int(len(sub))}
 
+    # 3D cross-tabs
+    for triple in (cross_tabs_3d or []):
+        d1_name, d2_name, d3_name = triple
+        if not all(d in dims_config for d in triple):
+            continue
+        d1 = dims_config[d1_name]; d2 = dims_config[d2_name]; d3 = dims_config[d3_name]
+        key = f"year|{d1_name}|{d2_name}|{d3_name}"
+        result[key] = {}
+        v1s = d1['values'] if d1['values'] is not None else sorted(df_all[d1['col']].dropna().unique())
+        v2s = d2['values'] if d2['values'] is not None else sorted(df_all[d2['col']].dropna().unique())
+        v3s = d3['values'] if d3['values'] is not None else sorted(df_all[d3['col']].dropna().unique())
+        for y in YEARS:
+            ydf = df_all[df_all['year'] == y]
+            for v1 in v1s:
+                df1 = ydf[ydf[d1['col']] == v1]
+                if df1.empty: continue
+                for v2 in v2s:
+                    df2 = df1[df1[d2['col']] == v2]
+                    if df2.empty: continue
+                    for v3 in v3s:
+                        sub = df2[df2[d3['col']] == v3]
+                        if len(sub) >= min_n:
+                            val = compute_fn(sub)
+                            if val is not None:
+                                result[key][f"{y}|{v1}|{v2}|{v3}"] = {"v": val, "n": int(len(sub))}
+
     return result
 
 
@@ -248,27 +298,27 @@ def compute_poverty(reg02):
     indicators['poverty_rate'] = {
         'label': 'Tasa de pobreza total', 'unit': '%',
         'data': aggregate(reg02, lambda s: weighted_pct(s, s['pobrezai'].isin([1, 2])),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
     indicators['extreme_poverty_rate'] = {
         'label': 'Pobreza extrema', 'unit': '%',
         'data': aggregate(reg02, lambda s: weighted_pct(s, s['pobrezai'] == 1),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
     indicators['non_extreme_poverty_rate'] = {
         'label': 'Pobreza no extrema', 'unit': '%',
         'data': aggregate(reg02, lambda s: weighted_pct(s, s['pobrezai'] == 2),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
     indicators['mean_ipcm'] = {
         'label': 'Ingreso per cápita medio (Gs.)', 'unit': 'Gs.',
         'data': aggregate(reg02, lambda s: weighted_mean(s, 'ipcm'),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
     indicators['median_ipcm'] = {
         'label': 'Ingreso per cápita mediano (Gs.)', 'unit': 'Gs.',
         'data': aggregate(reg02, lambda s: weighted_median(s, 'ipcm'),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     return {"indicators": indicators}
@@ -288,14 +338,14 @@ def compute_employment(reg02):
     indicators['activity_rate'] = {
         'label': 'Tasa de actividad', 'unit': '%',
         'data': aggregate(wap, lambda s: weighted_pct(s, s['CATE_PEA'].notna() & (s['CATE_PEA'] > 0)),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # Employment rate: Occupied / WAP
     indicators['employment_rate'] = {
         'label': 'Tasa de empleo', 'unit': '%',
         'data': aggregate(wap, lambda s: weighted_pct(s, s['CATE_PEA'].isin([1,2,3,4,5,6])),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # Unemployment rate: among PEA
@@ -304,7 +354,7 @@ def compute_employment(reg02):
         'label': 'Tasa de desempleo', 'unit': '%',
         'data': aggregate(pea, lambda s: weighted_pct(s, s['CATE_PEA'] == 7) if 7 in s['CATE_PEA'].values
                           else weighted_pct(s, ~s['CATE_PEA'].isin([1,2,3,4,5,6])),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # Informality rate: among occupied with informality data
@@ -313,7 +363,7 @@ def compute_employment(reg02):
     indicators['informality_rate'] = {
         'label': 'Tasa de informalidad', 'unit': '%',
         'data': aggregate(occ_inf, lambda s: weighted_pct(s, s['informalidad'] == 2),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # Category distribution (CATE_PEA)
@@ -323,7 +373,7 @@ def compute_employment(reg02):
         indicators[f'cate_pea_{cat_val}'] = {
             'label': cat_label, 'unit': '%',
             'data': aggregate(occ, lambda s, cv=cat_val: weighted_pct(s, s['CATE_PEA'] == cv),
-                              DIMENSIONS, CROSS_TABS_2D)
+                              DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
         }
 
     # Industry distribution (RAMA_PEA)
@@ -334,7 +384,7 @@ def compute_employment(reg02):
         indicators[f'rama_pea_{rv}'] = {
             'label': rl, 'unit': '%',
             'data': aggregate(occ, lambda s, v=rv: weighted_pct(s, s['RAMA_PEA'] == v),
-                              DIMENSIONS, CROSS_TABS_2D)
+                              DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
         }
 
     return {"indicators": indicators}
@@ -347,12 +397,12 @@ def compute_income(reg02):
     indicators['mean_income'] = {
         'label': 'Ingreso per cápita medio', 'unit': 'Gs.',
         'data': aggregate(reg02, lambda s: weighted_mean(s, 'ipcm'),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
     indicators['median_income'] = {
         'label': 'Ingreso per cápita mediano', 'unit': 'Gs.',
         'data': aggregate(reg02, lambda s: weighted_median(s, 'ipcm'),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # Income by quintile
@@ -408,12 +458,12 @@ def compute_income(reg02):
     indicators['mean_wage_age'] = {
         'label': 'Ingreso medio por edad (ocupados)', 'unit': 'Gs.',
         'data': aggregate(occ, lambda s: weighted_mean(s, 'ipcm'),
-                          WAGE_DIMS, WAGE_CROSS)
+                          WAGE_DIMS, WAGE_CROSS, WAGE_CROSS_3D)
     }
     indicators['median_wage_age'] = {
         'label': 'Ingreso mediano por edad (ocupados)', 'unit': 'Gs.',
         'data': aggregate(occ, lambda s: weighted_median(s, 'ipcm'),
-                          WAGE_DIMS, WAGE_CROSS)
+                          WAGE_DIMS, WAGE_CROSS, WAGE_CROSS_3D)
     }
 
     # ---- Masa salarial + trabajadores por edad simple, sexo, año, categoría ----
@@ -474,7 +524,7 @@ def compute_education(reg02):
     indicators['literacy_rate'] = {
         'label': 'Tasa de alfabetización (15+)', 'unit': '%',
         'data': aggregate(pop15, lambda s: weighted_pct(s, s['ED02'] == 1) if 'ED02' in s.columns else None,
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # School attendance 6-17
@@ -482,7 +532,7 @@ def compute_education(reg02):
     indicators['school_attendance'] = {
         'label': 'Asistencia escolar (6-17)', 'unit': '%',
         'data': aggregate(pop6_17, lambda s: weighted_pct(s, s['ED01'] == 1) if 'ED01' in s.columns else None,
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # Mean years of schooling (25+)
@@ -490,7 +540,7 @@ def compute_education(reg02):
     indicators['mean_schooling'] = {
         'label': 'Años de escolaridad promedio (25+)', 'unit': 'años',
         'data': aggregate(pop25, lambda s: weighted_mean(s, 'añoest'),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # NiNi rate (15-24 not studying and not working)
@@ -499,14 +549,14 @@ def compute_education(reg02):
         'label': 'Tasa NiNi (15-24)', 'unit': '%',
         'data': aggregate(pop15_24,
                           lambda s: weighted_pct(s, (s['ED01'] != 1) & (~s['CATE_PEA'].isin([1,2,3,4,5,6]))),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     # No education (añoest == 0 among 15+)
     indicators['no_education_rate'] = {
         'label': 'Sin instrucción (15+)', 'unit': '%',
         'data': aggregate(pop15, lambda s: weighted_pct(s, s['añoest'] == 0),
-                          DIMENSIONS, CROSS_TABS_2D)
+                          DIMENSIONS, CROSS_TABS_2D, CROSS_TABS_3D)
     }
 
     return {"indicators": indicators}
