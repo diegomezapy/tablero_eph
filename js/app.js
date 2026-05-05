@@ -35,6 +35,8 @@ function makeMultiSelectWidget(selectEl, dim) {
     });
   });
 
+  panel.addEventListener('click', e => e.stopPropagation());
+
   btn.addEventListener('click', e => {
     e.stopPropagation();
     const wasOpen = wrap.classList.contains('open');
