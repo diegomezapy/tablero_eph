@@ -12,7 +12,7 @@ from pathlib import Path
 
 # --- Configuration ---
 YEARS = [2022, 2023, 2024, 2025]
-BASE_DIR = Path("G:/Mi unidad/EPHn")
+BASE_DIR = Path("H:/Mi unidad/EPHn")
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
 
 REG02_PATHS = {
@@ -20,9 +20,9 @@ REG02_PATHS = {
 }
 
 REG01_PATHS = {
-    2022: (BASE_DIR / "INDICADORES_GR" / "R01_EPH2022.SAV", "sav"),
-    2023: (BASE_DIR / "INDICADORES_GR" / "R01_EPH2023.SAV", "sav"),
-    2024: (BASE_DIR / "REG01_EPHC_ANUAL_2024.SAV", "sav"),
+    2022: (BASE_DIR / "REG01_EPHC_ANUAL_2022.csv", "csv"),
+    2023: (BASE_DIR / "REG01_EPHC_ANUAL_2023.csv", "csv"),
+    2024: (BASE_DIR / "REG01_EPHC_ANUAL_2024.csv", "csv"),
     2025: (BASE_DIR / "REG01_EPHC_ANUAL_2025.csv", "csv"),
 }
 
