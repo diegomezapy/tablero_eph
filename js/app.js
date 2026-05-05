@@ -27,7 +27,11 @@ function updateDashboard() {
 }
 
 async function onTabChange(theme) {
-  await loadTheme(theme);
+  if (theme === 'wages') {
+    await loadTheme('income');
+  } else {
+    await loadTheme(theme);
+  }
   updateFilterUI();
   drawCurrentTab();
   if (theme === 'map') {
@@ -105,7 +109,7 @@ async function init() {
       loadTheme('income'),
       loadTheme('education'),
       loadTheme('housing'),
-      loadTheme('demographics')
+      loadTheme('demographics'),
     ]);
 
     // Bind filter events
@@ -131,6 +135,12 @@ async function init() {
     // Map indicator selector
     const mapInd = document.getElementById('mapIndicator');
     if (mapInd) mapInd.addEventListener('change', updateMap);
+
+    // Wage tab: deflation toggle + export button
+    const deflateChk = document.getElementById('wage-deflate');
+    if (deflateChk) deflateChk.addEventListener('change', () => drawWageCharts());
+    const exportBtn = document.getElementById('btn-export-excel');
+    if (exportBtn) exportBtn.addEventListener('click', exportToExcel);
 
     // Mobile sidebar toggle
     const sidebarToggle = document.getElementById('sidebar-toggle');

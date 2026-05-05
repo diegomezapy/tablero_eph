@@ -347,6 +347,38 @@ def compute_income(reg02):
                               DIMENSIONS, CROSS_TABS_2D)
         }
 
+    # ---- Wage trajectories: mean ipcm by age_group (occupied workers only) ----
+    occ = reg02[reg02['CATE_PEA'].isin([1, 2, 3, 4, 5, 6]) & reg02['ipcm'].notna() & (reg02['ipcm'] > 0)].copy()
+
+    WAGE_DIMS = {
+        'age_group': DIMENSIONS['age_group'],
+        'area':      DIMENSIONS['area'],
+        'sex':       DIMENSIONS['sex'],
+        'dpto':      DIMENSIONS['dpto'],
+        'poverty':   DIMENSIONS['poverty'],
+    }
+    WAGE_CROSS = [
+        ('age_group', 'sex'),
+        ('age_group', 'area'),
+        ('age_group', 'poverty'),
+        ('dpto', 'area'),
+        ('dpto', 'sex'),
+        ('area', 'sex'),
+        ('area', 'poverty'),
+        ('sex', 'poverty'),
+    ]
+
+    indicators['mean_wage_age'] = {
+        'label': 'Ingreso medio por edad (ocupados)', 'unit': 'Gs.',
+        'data': aggregate(occ, lambda s: weighted_mean(s, 'ipcm'),
+                          WAGE_DIMS, WAGE_CROSS)
+    }
+    indicators['median_wage_age'] = {
+        'label': 'Ingreso mediano por edad (ocupados)', 'unit': 'Gs.',
+        'data': aggregate(occ, lambda s: weighted_median(s, 'ipcm'),
+                          WAGE_DIMS, WAGE_CROSS)
+    }
+
     return {"indicators": indicators}
 
 
@@ -569,6 +601,14 @@ def write_metadata(reg02):
             "1": "Agricultura", "2": "Industria", "3": "Electricidad/agua",
             "4": "Construcción", "5": "Comercio/hoteles", "6": "Transporte/comunicaciones",
             "7": "Finanzas/seguros", "8": "Serv. comunales/sociales"
+        },
+        "ipc": {
+            "base_year": 2022,
+            "note": "IPC promedio anual Paraguay, base 2022=100. Fuente: BCP.",
+            "2022": 100.0,
+            "2023": 108.3,
+            "2024": 113.1,
+            "2025": 116.5
         }
     }
 

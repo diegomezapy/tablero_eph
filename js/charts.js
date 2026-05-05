@@ -514,6 +514,302 @@ function drawDemographicsCharts() {
 }
 
 const AGE_LABELS = ['0-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65+'];
+const WAGE_AGE_LABELS = ['15-24', '25-34', '35-44', '45-54', '55-64', '65+'];
+
+// ============================================================
+// --- Wage Trajectories Tab ---
+// ============================================================
+
+function getIpcDeflator(year) {
+  const ipc = dashboardData.metadata?.ipc;
+  if (!ipc) return 1;
+  return (ipc[String(ipc.base_year)] || 100) / (ipc[String(year)] || 100);
+}
+
+function deflateLabel() {
+  const chk = document.getElementById('wage-deflate');
+  return chk && chk.checked;
+}
+
+function applyDeflation(value, year) {
+  if (!deflateLabel() || value == null) return value;
+  return value * getIpcDeflator(year);
+}
+
+function drawWageCharts() {
+  const d = dashboardData.income;
+  if (!d) return;
+
+  const year = filterState.year;
+  const deflate = deflateLabel();
+  const baseYear = dashboardData.metadata?.ipc?.base_year || 2022;
+  const yLabel = deflate ? `Gs. constantes ${baseYear}` : 'Gs. corrientes';
+
+  // Sync year labels in headings
+  const yl = document.getElementById('wage-year-label');
+  const yl2 = document.getElementById('wage-gap-year');
+  if (yl) yl.textContent = year;
+  if (yl2) yl2.textContent = year;
+
+  // --- 1. Wage trajectory by age group (multi-year lines) ---
+  const trajDatasets = YEARS.map((y, i) => {
+    const vals = WAGE_AGE_LABELS.map(ag => {
+      // look up year|age_group
+      const entry = d.indicators?.mean_wage_age?.data?.['year|age_group']?.[`${y}|${ag}`];
+      return entry?.v != null ? applyDeflation(entry.v, y) : null;
+    });
+    return {
+      label: String(y),
+      data: vals,
+      borderColor: COLORS.palette[i],
+      backgroundColor: COLORS.paletteLight[i],
+      tension: 0.35,
+      fill: false,
+      pointRadius: 5,
+      pointHoverRadius: 7
+    };
+  });
+
+  charts.wageTraj = destroyChart(charts.wageTraj);
+  const ctx1 = document.getElementById('chart-wage-trajectory');
+  if (ctx1) {
+    const title = deflate ? `Trayectoria salarial — Gs. constantes ${baseYear}` : 'Trayectoria salarial por grupo de edad';
+    const titleEl = document.getElementById('wage-traj-title');
+    if (titleEl) titleEl.textContent = title;
+
+    charts.wageTraj = new Chart(ctx1, {
+      type: 'line',
+      data: { labels: WAGE_AGE_LABELS, datasets: trajDatasets },
+      options: deepMerge(getChartDefaults(), {
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatGs(ctx.raw)}` } }
+        },
+        scales: {
+          y: { ticks: { callback: v => formatNumber(v) }, title: { display: true, text: yLabel, font: { size: 10 } } }
+        }
+      })
+    });
+  }
+
+  // --- 2. Income by sex x age group (grouped bar, current year) ---
+  const maleVals = WAGE_AGE_LABELS.map(ag => {
+    const entry = d.indicators?.mean_wage_age?.data?.['year|age_group|sex']?.[`${year}|${ag}|1`];
+    return entry?.v != null ? applyDeflation(entry.v, year) : null;
+  });
+  const femaleVals = WAGE_AGE_LABELS.map(ag => {
+    const entry = d.indicators?.mean_wage_age?.data?.['year|age_group|sex']?.[`${year}|${ag}|6`];
+    return entry?.v != null ? applyDeflation(entry.v, year) : null;
+  });
+
+  charts.wageSexAge = destroyChart(charts.wageSexAge);
+  const ctx2 = document.getElementById('chart-wage-sex-age');
+  if (ctx2) {
+    charts.wageSexAge = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: WAGE_AGE_LABELS,
+        datasets: [
+          { label: 'Hombre', data: maleVals, backgroundColor: COLORS.primary + 'cc' },
+          { label: 'Mujer',  data: femaleVals, backgroundColor: COLORS.danger + 'cc' }
+        ]
+      },
+      options: deepMerge(getChartDefaults(), {
+        plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatGs(ctx.raw)}` } } },
+        scales: { y: { ticks: { callback: v => formatNumber(v) } } }
+      })
+    });
+  }
+
+  // --- 3. Evolution line (mean + median wages, respects all active filters) ---
+  const tsMeanW = YEARS.map(y => {
+    const active = getActiveFilters();
+    const sorted = [...active].sort((a, b) => a.dim.localeCompare(b.dim));
+    let key, lookup;
+    if (sorted.length === 0) { key = 'year'; lookup = String(y); }
+    else {
+      key = 'year|' + sorted.map(f => f.dim).join('|');
+      lookup = y + '|' + sorted.map(f => f.val).join('|');
+    }
+    const entry = d.indicators?.mean_wage_age?.data?.[key]?.[lookup];
+    const val = entry?.v != null ? applyDeflation(entry.v, y) : null;
+    return { year: y, value: val };
+  });
+  const tsMedianW = YEARS.map(y => {
+    const active = getActiveFilters();
+    const sorted = [...active].sort((a, b) => a.dim.localeCompare(b.dim));
+    let key, lookup;
+    if (sorted.length === 0) { key = 'year'; lookup = String(y); }
+    else {
+      key = 'year|' + sorted.map(f => f.dim).join('|');
+      lookup = y + '|' + sorted.map(f => f.val).join('|');
+    }
+    const entry = d.indicators?.median_wage_age?.data?.[key]?.[lookup];
+    const val = entry?.v != null ? applyDeflation(entry.v, y) : null;
+    return { year: y, value: val };
+  });
+
+  charts.wageEvol = destroyChart(charts.wageEvol);
+  const ctx3 = document.getElementById('chart-wage-evolution');
+  if (ctx3) {
+    charts.wageEvol = new Chart(ctx3, {
+      type: 'line',
+      data: {
+        labels: YEARS,
+        datasets: [
+          { label: `Ingreso medio (${yLabel})`, data: tsMeanW.map(t => t.value), borderColor: COLORS.primary, tension: 0.3 },
+          { label: `Ingreso mediano (${yLabel})`, data: tsMedianW.map(t => t.value), borderColor: COLORS.success, tension: 0.3, borderDash: [5,3] }
+        ]
+      },
+      options: deepMerge(getChartDefaults(), {
+        plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatGs(ctx.raw)}` } } },
+        scales: { y: { ticks: { callback: v => formatNumber(v) } } }
+      })
+    });
+  }
+
+  // --- 4. Gender gap by age group (ratio H/M) ---
+  const gapVals = WAGE_AGE_LABELS.map((ag, i) => {
+    const m = maleVals[i], f = femaleVals[i];
+    if (m == null || f == null || f === 0) return null;
+    return parseFloat((m / f).toFixed(3));
+  });
+  const gapColors = gapVals.map(v => v == null ? COLORS.gray : v > 1 ? COLORS.primary + 'cc' : COLORS.danger + 'cc');
+
+  charts.wageGap = destroyChart(charts.wageGap);
+  const ctx4 = document.getElementById('chart-wage-gap');
+  if (ctx4) {
+    charts.wageGap = new Chart(ctx4, {
+      type: 'bar',
+      data: {
+        labels: WAGE_AGE_LABELS,
+        datasets: [{
+          label: 'Ratio Hombre/Mujer',
+          data: gapVals,
+          backgroundColor: gapColors
+        }]
+      },
+      options: deepMerge(getChartDefaults(), {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ctx.raw != null ? `Ratio: ${ctx.raw.toFixed(2)}x` : 'N/D' } },
+          annotation: {}
+        },
+        scales: {
+          y: {
+            min: 0.7,
+            ticks: { callback: v => v.toFixed(2) + 'x' },
+            title: { display: true, text: 'H / M', font: { size: 10 } }
+          }
+        }
+      })
+    });
+    // Draw reference line at 1.0 via annotation plugin fallback (CSS approach)
+  }
+}
+
+// ============================================================
+// --- Excel Export ---
+// ============================================================
+
+function exportToExcel() {
+  if (typeof XLSX === 'undefined') {
+    alert('La librería de Excel no está disponible. Verifique la conexión a internet.');
+    return;
+  }
+
+  const d = dashboardData.income;
+  const meta = dashboardData.metadata;
+  if (!d) { alert('Los datos de ingresos aún no están cargados.'); return; }
+
+  const wb = XLSX.utils.book_new();
+  const deflate = deflateLabel();
+  const baseYear = meta?.ipc?.base_year || 2022;
+  const ipcNote = deflate ? `Gs. constantes ${baseYear} (deflactado por IPC)` : 'Gs. corrientes';
+
+  // --- Sheet 1: Trayectoria por año y edad ---
+  const rows1 = [['Año', 'Grupo de Edad', `Ingreso Medio (${ipcNote})`, `Ingreso Mediano (${ipcNote})`]];
+  YEARS.forEach(y => {
+    WAGE_AGE_LABELS.forEach(ag => {
+      const em = d.indicators?.mean_wage_age?.data?.['year|age_group']?.[`${y}|${ag}`];
+      const emed = d.indicators?.median_wage_age?.data?.['year|age_group']?.[`${y}|${ag}`];
+      const vm = em?.v != null ? (deflate ? em.v * getIpcDeflator(y) : em.v) : null;
+      const vmed = emed?.v != null ? (deflate ? emed.v * getIpcDeflator(y) : emed.v) : null;
+      rows1.push([y, ag, vm != null ? Math.round(vm) : '', vmed != null ? Math.round(vmed) : '']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows1), 'Trayectoria_Edad');
+
+  // --- Sheet 2: Trayectoria por año, edad y sexo ---
+  const rows2 = [['Año', 'Grupo de Edad', 'Sexo', `Ingreso Medio (${ipcNote})`]];
+  YEARS.forEach(y => {
+    WAGE_AGE_LABELS.forEach(ag => {
+      [[1, 'Hombre'], [6, 'Mujer']].forEach(([sx, slbl]) => {
+        const entry = d.indicators?.mean_wage_age?.data?.['year|age_group|sex']?.[`${y}|${ag}|${sx}`];
+        const val = entry?.v != null ? (deflate ? entry.v * getIpcDeflator(y) : entry.v) : null;
+        rows2.push([y, ag, slbl, val != null ? Math.round(val) : '']);
+      });
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows2), 'Trayectoria_Edad_Sexo');
+
+  // --- Sheet 3: Brecha salarial (ratio H/M) ---
+  const rows3 = [['Año', 'Grupo de Edad', 'Ratio Hombre/Mujer', 'Ingreso Hombre', 'Ingreso Mujer']];
+  YEARS.forEach(y => {
+    WAGE_AGE_LABELS.forEach(ag => {
+      const em = d.indicators?.mean_wage_age?.data?.['year|age_group|sex']?.[`${y}|${ag}|1`];
+      const ef = d.indicators?.mean_wage_age?.data?.['year|age_group|sex']?.[`${y}|${ag}|6`];
+      const vm = em?.v != null ? (deflate ? em.v * getIpcDeflator(y) : em.v) : null;
+      const vf = ef?.v != null ? (deflate ? ef.v * getIpcDeflator(y) : ef.v) : null;
+      const ratio = vm != null && vf != null && vf > 0 ? parseFloat((vm / vf).toFixed(3)) : '';
+      rows3.push([y, ag, ratio, vm != null ? Math.round(vm) : '', vf != null ? Math.round(vf) : '']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows3), 'Brecha_Salarial');
+
+  // --- Sheet 4: Ingreso medio general (todos los filtros activos) ---
+  const active = getActiveFilters();
+  const filterDesc = active.length > 0
+    ? active.map(f => `${f.dim}=${f.val}`).join(', ')
+    : 'Sin filtros';
+  const rows4 = [
+    [`Filtros aplicados: ${filterDesc}`, '', '', ''],
+    ['Año', `Ingreso Medio (${ipcNote})`, `Ingreso Mediano (${ipcNote})`, 'N (observaciones)']
+  ];
+  YEARS.forEach(y => {
+    const sorted = [...active].sort((a, b) => a.dim.localeCompare(b.dim));
+    let key, lookup;
+    if (sorted.length === 0) { key = 'year'; lookup = String(y); }
+    else {
+      key = 'year|' + sorted.map(f => f.dim).join('|');
+      lookup = y + '|' + sorted.map(f => f.val).join('|');
+    }
+    const em = d.indicators?.mean_wage_age?.data?.[key]?.[lookup];
+    const emed = d.indicators?.median_wage_age?.data?.[key]?.[lookup];
+    const vm = em?.v != null ? (deflate ? em.v * getIpcDeflator(y) : em.v) : null;
+    const vmed = emed?.v != null ? (deflate ? emed.v * getIpcDeflator(y) : emed.v) : null;
+    rows4.push([y, vm != null ? Math.round(vm) : '', vmed != null ? Math.round(vmed) : '', em?.n ?? '']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows4), 'Serie_Anual');
+
+  // --- Sheet 5: IPC utilizado ---
+  const ipc = meta?.ipc || {};
+  const rows5 = [
+    ['Fuente IPC:', ipc.note || 'BCP Paraguay'],
+    ['Año base:', String(ipc.base_year || 2022)],
+    [],
+    ['Año', 'IPC (promedio anual)', 'Factor deflactor (base=2022)']
+  ];
+  YEARS.forEach(y => {
+    const ipcVal = ipc[String(y)] || '';
+    const factor = ipc[String(y)] ? parseFloat((100 / ipc[String(y)]).toFixed(4)) : '';
+    rows5.push([y, ipcVal, factor]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows5), 'IPC_Deflactor');
+
+  const fname = `trayectorias_salariales_EPHC_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, fname);
+}
 
 // --- Tab draw dispatcher ---
 function drawCurrentTab() {
@@ -527,6 +823,7 @@ function drawCurrentTab() {
     case 'education': drawEducationCharts(); break;
     case 'housing': drawHousingCharts(); break;
     case 'demographics': drawDemographicsCharts(); break;
+    case 'wages': drawWageCharts(); break;
     case 'map': if (typeof updateMap === 'function') updateMap(); break;
   }
 }
