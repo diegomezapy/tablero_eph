@@ -32,20 +32,8 @@ function updateFilter(dim, val) {
     filterState[dim] = arr.length === 0 ? null
       : arr.map(v => (v !== '' && !isNaN(v)) ? parseFloat(v) : v);
   }
-  enforceMaxDimensions(dim);
   updateFilterUI();
   updateDashboard();
-}
-
-function enforceMaxDimensions(justChanged) {
-  const active = getActiveFilters();
-  if (active.length > 2) {
-    const toRemove = active.find(f => f.dim !== justChanged);
-    if (toRemove) {
-      filterState[toRemove.dim] = null;
-      clearMsWidget(toRemove.dim);
-    }
-  }
 }
 
 function clearMsWidget(dim) {
