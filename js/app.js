@@ -78,6 +78,7 @@ document.addEventListener('click', () => {
 
 const dashboardData = {};
 const loadedThemes = new Set();
+let currentActiveTheme = 'poverty';
 
 async function fetchJSON(url) {
   const resp = await fetch(url);
@@ -101,6 +102,7 @@ function updateDashboard() {
 }
 
 async function onTabChange(theme) {
+  currentActiveTheme = theme;
   if (theme === 'wages') {
     await loadTheme('income');
   } else {

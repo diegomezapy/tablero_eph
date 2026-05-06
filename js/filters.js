@@ -90,21 +90,24 @@ function updateFilterUI() {
     }
   });
 
-  // Formality-specific filters: only enabled on the Formalidad tab
+  // Formality-specific filters: only visible on the Formalidad tab
   const isFormalityTab = document.querySelector('#tab-formality.active') !== null ||
-    document.querySelector('[data-bs-target="#tab-formality"].active') !== null;
-  FORMALITY_ONLY_DIMS.forEach(dim => {
-    const wrap = document.querySelector(`.ms-wrap[data-dim="${dim}"]`);
-    if (!wrap) return;
-    const btn = wrap.querySelector('.ms-btn');
-    if (btn) btn.disabled = !isFormalityTab;
-    wrap.querySelectorAll('input[type="checkbox"]').forEach(inp => inp.disabled = !isFormalityTab);
-    if (!isFormalityTab && filterState[dim] != null) {
-      filterState[dim] = null;
-      wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-      updateMsDisplay(wrap, []);
-    }
-  });
+    document.querySelector('[data-bs-target="#tab-formality"].active') !== null ||
+    currentActiveTheme === 'formality';
+  const fSection = document.getElementById('formality-filter-section');
+  if (fSection) fSection.style.display = isFormalityTab ? '' : 'none';
+  if (!isFormalityTab) {
+    FORMALITY_ONLY_DIMS.forEach(dim => {
+      if (filterState[dim] != null) {
+        filterState[dim] = null;
+        const wrap = document.querySelector(`.ms-wrap[data-dim="${dim}"]`);
+        if (wrap) {
+          wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+          updateMsDisplay(wrap, []);
+        }
+      }
+    });
+  }
 }
 
 // ============================================================
