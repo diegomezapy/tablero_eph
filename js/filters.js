@@ -19,7 +19,6 @@ const filterState = {
 
 const YEARS = [2022, 2023, 2024, 2025];
 const ALL_FILTER_DIMS = ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea', 'ruc', 'tama_emp', 'cotiza_ips'];
-const FORMALITY_ONLY_DIMS = ['ruc', 'tama_emp', 'cotiza_ips'];
 
 // Returns [{dim, val: [array of selected values]}] for active (non-null) filters
 function getActiveFilters() {
@@ -74,10 +73,11 @@ function updateFilterUI() {
     btn.classList.remove('btn-outline-primary');
   });
 
-  // Disable person-level filters for housing tab
+  // Vivienda usa REG01: deshabilitar filtros de persona y empresa
   const isHousingTab = document.querySelector('#tab-housing.active') !== null ||
-    document.querySelector('[data-bs-target="#tab-housing"].active') !== null;
-  ['sex', 'age_group', 'condact', 'cate_pea', 'rama_pea'].forEach(dim => {
+    document.querySelector('[data-bs-target="#tab-housing"].active') !== null ||
+    currentActiveTheme === 'housing';
+  ['sex', 'age_group', 'condact', 'cate_pea', 'rama_pea', 'ruc', 'tama_emp', 'cotiza_ips'].forEach(dim => {
     const wrap = document.querySelector(`.ms-wrap[data-dim="${dim}"]`);
     if (!wrap) return;
     const btn = wrap.querySelector('.ms-btn');
@@ -90,24 +90,6 @@ function updateFilterUI() {
     }
   });
 
-  // Formality-specific filters: only visible on the Formalidad tab
-  const isFormalityTab = document.querySelector('#tab-formality.active') !== null ||
-    document.querySelector('[data-bs-target="#tab-formality"].active') !== null ||
-    currentActiveTheme === 'formality';
-  const fSection = document.getElementById('formality-filter-section');
-  if (fSection) fSection.style.display = isFormalityTab ? '' : 'none';
-  if (!isFormalityTab) {
-    FORMALITY_ONLY_DIMS.forEach(dim => {
-      if (filterState[dim] != null) {
-        filterState[dim] = null;
-        const wrap = document.querySelector(`.ms-wrap[data-dim="${dim}"]`);
-        if (wrap) {
-          wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-          updateMsDisplay(wrap, []);
-        }
-      }
-    });
-  }
 }
 
 // ============================================================
