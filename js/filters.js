@@ -4,7 +4,7 @@
 
 const filterState = {
   year: 2025,
-  dpto: null,      // null | [values...]
+  dpto: null,        // null | [values...]
   area: null,
   sex: null,
   age_group: null,
@@ -12,10 +12,14 @@ const filterState = {
   condact: null,
   cate_pea: null,
   rama_pea: null,
+  ruc: null,
+  tama_emp: null,
+  cotiza_ips: null,
 };
 
 const YEARS = [2022, 2023, 2024, 2025];
-const ALL_FILTER_DIMS = ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea'];
+const ALL_FILTER_DIMS = ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea', 'ruc', 'tama_emp', 'cotiza_ips'];
+const FORMALITY_ONLY_DIMS = ['ruc', 'tama_emp', 'cotiza_ips'];
 
 // Returns [{dim, val: [array of selected values]}] for active (non-null) filters
 function getActiveFilters() {
@@ -80,6 +84,22 @@ function updateFilterUI() {
     if (btn) btn.disabled = isHousingTab;
     wrap.querySelectorAll('input[type="checkbox"]').forEach(inp => inp.disabled = isHousingTab);
     if (isHousingTab && filterState[dim] != null) {
+      filterState[dim] = null;
+      wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      updateMsDisplay(wrap, []);
+    }
+  });
+
+  // Formality-specific filters: only enabled on the Formalidad tab
+  const isFormalityTab = document.querySelector('#tab-formality.active') !== null ||
+    document.querySelector('[data-bs-target="#tab-formality"].active') !== null;
+  FORMALITY_ONLY_DIMS.forEach(dim => {
+    const wrap = document.querySelector(`.ms-wrap[data-dim="${dim}"]`);
+    if (!wrap) return;
+    const btn = wrap.querySelector('.ms-btn');
+    if (btn) btn.disabled = !isFormalityTab;
+    wrap.querySelectorAll('input[type="checkbox"]').forEach(inp => inp.disabled = !isFormalityTab);
+    if (!isFormalityTab && filterState[dim] != null) {
       filterState[dim] = null;
       wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
       updateMsDisplay(wrap, []);
@@ -170,14 +190,17 @@ function lookupByDimension(themeData, indicatorId, dimName) {
 function getDimLabel(dim, val, metadata) {
   if (!metadata) return String(val);
   const map = {
-    'dpto':     metadata.departments,
-    'area':     metadata.areas,
-    'sex':      metadata.sex,
-    'poverty':  metadata.poverty_levels,
-    'condact':  metadata.condact,
-    'cate_pea': metadata.cate_pea,
-    'rama_pea': metadata.rama_pea,
-    'age_group': null,
+    'dpto':       metadata.departments,
+    'area':       metadata.areas,
+    'sex':        metadata.sex,
+    'poverty':    metadata.poverty_levels,
+    'condact':    metadata.condact,
+    'cate_pea':   metadata.cate_pea,
+    'rama_pea':   metadata.rama_pea,
+    'ruc':        metadata.ruc,
+    'tama_emp':   metadata.tama_emp,
+    'cotiza_ips': metadata.cotiza_ips,
+    'age_group':  null,
   };
   if (dim === 'age_group') return String(val);
   const m = map[dim];

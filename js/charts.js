@@ -907,6 +907,158 @@ function exportToExcel() {
   XLSX.writeFile(wb, fname);
 }
 
+// ============================================================
+// --- Formality Tab ---
+// ============================================================
+
+function updateFormalityKPIs() {
+  const d = dashboardData.formality;
+  if (!d) return;
+
+  const fkpis = [
+    { id: 'fkpi-formality',  ind: 'formality_rate',  label: 'Formalidad',           unit: '%' },
+    { id: 'fkpi-ips',        ind: 'ips_rate',         label: 'Cobertura IPS',        unit: '%' },
+    { id: 'fkpi-ruc',        ind: 'ruc_has_rate',     label: 'Establec. con RUC',    unit: '%' },
+    { id: 'fkpi-nocotiza',   ind: 'no_cotiza_rate',   label: 'Sin cobertura prev.',  unit: '%', invertTrend: true },
+  ];
+
+  fkpis.forEach(k => {
+    const el = document.getElementById(k.id);
+    if (!el) return;
+    const current = lookupIndicator(d, k.ind);
+    const savedYear = filterState.year;
+    let prev = null;
+    if (savedYear - 1 >= 2022) {
+      filterState.year = savedYear - 1;
+      prev = lookupIndicator(d, k.ind);
+      filterState.year = savedYear;
+    }
+    const valEl = el.querySelector('.kpi-value');
+    const trendEl = el.querySelector('.kpi-trend-container');
+    if (valEl) valEl.textContent = formatValue(current?.v, k.unit);
+    if (trendEl && prev && current?.v != null && prev.v != null) {
+      const diff = current.v - prev.v;
+      const arrow = diff > 0 ? 'bi-arrow-up-short' : diff < 0 ? 'bi-arrow-down-short' : 'bi-dash';
+      const cls = k.invertTrend ? (diff < 0 ? 'up' : diff > 0 ? 'down' : '') : (diff > 0 ? 'up' : diff < 0 ? 'down' : '');
+      const diffText = Math.abs(diff).toFixed(1);
+      trendEl.innerHTML = `<span class="kpi-trend ${cls}"><i class="bi ${arrow}"></i>${diffText}pp</span>`;
+    } else if (trendEl) {
+      trendEl.innerHTML = '';
+    }
+  });
+}
+
+function drawFormalityCharts() {
+  const d = dashboardData.formality;
+  if (!d) return;
+
+  updateFormalityKPIs();
+
+  // 1. Evolution: formality + informality over years
+  const tsFormal   = lookupTimeSeries(d, 'formality_rate');
+  const tsInformal = lookupTimeSeries(d, 'informality_rate');
+  charts.formalityEvolution = destroyChart(charts.formalityEvolution);
+  const ctx1 = document.getElementById('chart-formality-evolution');
+  if (ctx1) {
+    charts.formalityEvolution = new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: YEARS,
+        datasets: [
+          { label: 'Formal',   data: tsFormal.map(t => t.value),   borderColor: COLORS.success, backgroundColor: 'rgba(42,157,143,0.1)', fill: true, tension: 0.3 },
+          { label: 'Informal', data: tsInformal.map(t => t.value), borderColor: COLORS.warning, backgroundColor: 'rgba(233,196,106,0.1)', fill: true, tension: 0.3 }
+        ]
+      },
+      options: deepMerge(getChartDefaults(), { plugins: { legend: { position: 'top' } } })
+    });
+  }
+
+  // 2. IPS coverage donut
+  const ipsYes   = lookupIndicator(d, 'ips_rate');
+  const ipsOtra  = lookupIndicator(d, 'otra_caja_rate');
+  const ipsNo    = lookupIndicator(d, 'no_cotiza_rate');
+  charts.ipsDonut = destroyChart(charts.ipsDonut);
+  const ctx2 = document.getElementById('chart-ips-donut');
+  if (ctx2) {
+    charts.ipsDonut = new Chart(ctx2, {
+      type: 'doughnut',
+      data: {
+        labels: ['Cotiza IPS', 'Otra caja', 'No cotiza'],
+        datasets: [{ data: [ipsYes?.v, ipsOtra?.v, ipsNo?.v], backgroundColor: [COLORS.primary, COLORS.success, COLORS.danger] }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+
+  // 3. Formality by empresa size
+  const byTama = lookupByDimension(d, 'formality_rate', 'tama_emp');
+  charts.formalityTama = destroyChart(charts.formalityTama);
+  const ctx3 = document.getElementById('chart-formality-tama');
+  if (ctx3 && byTama.length > 0) {
+    charts.formalityTama = new Chart(ctx3, {
+      type: 'bar',
+      data: {
+        labels: byTama.map(x => getDimLabel('tama_emp', x.key, dashboardData.metadata)),
+        datasets: [{ label: 'Formalidad %', data: byTama.map(x => x.value), backgroundColor: COLORS.success + '99' }]
+      },
+      options: deepMerge(getChartDefaults(), { indexAxis: 'y', plugins: { legend: { display: false } } })
+    });
+  }
+
+  // 4. RUC donut
+  const rucYes     = lookupIndicator(d, 'ruc_has_rate');
+  const rucNo      = lookupIndicator(d, 'ruc_no_rate');
+  const rucUnknown = lookupIndicator(d, 'ruc_unknown_rate');
+  charts.rucDonut = destroyChart(charts.rucDonut);
+  const ctx4 = document.getElementById('chart-ruc-donut');
+  if (ctx4) {
+    charts.rucDonut = new Chart(ctx4, {
+      type: 'doughnut',
+      data: {
+        labels: ['Tiene RUC', 'Sin RUC', 'No sabe'],
+        datasets: [{ data: [rucYes?.v, rucNo?.v, rucUnknown?.v], backgroundColor: [COLORS.success, COLORS.danger, COLORS.warning] }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+
+  // 5. Formality by rama_pea
+  const byRama = lookupByDimension(d, 'formality_rate', 'rama_pea');
+  charts.formalityRama = destroyChart(charts.formalityRama);
+  const ctx5 = document.getElementById('chart-formality-rama');
+  if (ctx5 && byRama.length > 0) {
+    charts.formalityRama = new Chart(ctx5, {
+      type: 'bar',
+      data: {
+        labels: byRama.map(x => getDimLabel('rama_pea', x.key, dashboardData.metadata)),
+        datasets: [{ label: 'Formalidad %', data: byRama.map(x => x.value), backgroundColor: COLORS.primary + '99' }]
+      },
+      options: deepMerge(getChartDefaults(), { indexAxis: 'y', plugins: { legend: { display: false } } })
+    });
+  }
+
+  // 6. Formality + IPS by cate_pea (grouped bar)
+  const byCate    = lookupByDimension(d, 'formality_rate', 'cate_pea');
+  const byIpsCate = lookupByDimension(d, 'ips_rate',       'cate_pea');
+  charts.formalityCate = destroyChart(charts.formalityCate);
+  const ctx6 = document.getElementById('chart-formality-cate');
+  if (ctx6 && byCate.length > 0) {
+    const cateLabels = byCate.map(x => getDimLabel('cate_pea', x.key, dashboardData.metadata));
+    const ipsByKey = Object.fromEntries(byIpsCate.map(x => [x.key, x.value]));
+    charts.formalityCate = new Chart(ctx6, {
+      type: 'bar',
+      data: {
+        labels: cateLabels,
+        datasets: [
+          { label: 'Formalidad %',  data: byCate.map(x => x.value),           backgroundColor: COLORS.success + '99' },
+          { label: 'Cotiza IPS %',  data: byCate.map(x => ipsByKey[x.key] ?? null), backgroundColor: COLORS.primary + '99' }
+        ]
+      },
+      options: deepMerge(getChartDefaults(), { plugins: { legend: { position: 'top' } } })
+    });
+  }
+}
+
 // --- Tab draw dispatcher ---
 function drawCurrentTab() {
   const activeTab = document.querySelector('.nav-tabs .nav-link.active');
@@ -919,7 +1071,8 @@ function drawCurrentTab() {
     case 'education': drawEducationCharts(); break;
     case 'housing': drawHousingCharts(); break;
     case 'demographics': drawDemographicsCharts(); break;
-    case 'wages': drawWageCharts(); break;
+    case 'wages':     drawWageCharts(); break;
+    case 'formality': drawFormalityCharts(); break;
     case 'map': if (typeof updateMap === 'function') updateMap(); break;
   }
 }

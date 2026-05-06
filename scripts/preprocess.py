@@ -94,6 +94,47 @@ WAGE_CROSS_3D = [
     ('cate_pea',  'condact',  'sex'),
 ]
 
+# Dimensions for formality analysis (includes workplace characteristics)
+FORMALITY_DIMS = {
+    'dpto':       {'col': 'DPTO',      'values': None},  # filled dynamically
+    'area':       {'col': 'AREA',      'values': [1, 6]},
+    'sex':        {'col': 'P06',       'values': [1, 6]},
+    'age_group':  {'col': 'age_group', 'values': AGE_LABELS},
+    'cate_pea':   {'col': 'CATE_PEA',  'values': [1, 2, 3, 4, 5, 6]},
+    'rama_pea':   {'col': 'RAMA_PEA',  'values': [1, 2, 3, 4, 5, 6, 7, 8]},
+    'ruc':        {'col': 'ruc',       'values': [1, 2, 6]},
+    'tama_emp':   {'col': 'tama_emp',  'values': [1, 2, 3, 4, 5]},
+    'cotiza_ips': {'col': 'cotiza_ips','values': [1, 2, 6]},
+}
+
+FORMALITY_CROSS_2D = [
+    ('area', 'cate_pea'),
+    ('area', 'cotiza_ips'),
+    ('area', 'ruc'),
+    ('area', 'sex'),
+    ('area', 'tama_emp'),
+    ('age_group', 'sex'),
+    ('cate_pea', 'cotiza_ips'),
+    ('cate_pea', 'ruc'),
+    ('cate_pea', 'sex'),
+    ('cate_pea', 'tama_emp'),
+    ('cotiza_ips', 'sex'),
+    ('dpto', 'sex'),
+    ('rama_pea', 'ruc'),
+    ('rama_pea', 'sex'),
+    ('ruc', 'sex'),
+    ('tama_emp', 'ruc'),
+    ('tama_emp', 'sex'),
+]
+
+FORMALITY_CROSS_3D = [
+    ('area', 'cate_pea', 'sex'),
+    ('area', 'cotiza_ips', 'sex'),
+    ('area', 'ruc', 'sex'),
+    ('area', 'tama_emp', 'sex'),
+    ('cate_pea', 'ruc', 'sex'),
+]
+
 # REG01 only has these dimensions
 DIMS_REG01 = {
     'dpto':    {'col': 'DPTO',     'values': None},
@@ -130,7 +171,8 @@ def load_reg02(year):
     # Ensure key columns are numeric
     for col in ['P02', 'P06', 'DPTO', 'AREA', 'pobrezai', 'pobnopoi',
                 'CATE_PEA', 'OCUP_PEA', 'RAMA_PEA', 'informalidad',
-                'quintili', 'decili', 'ED01', 'ED02', 'PEAA', 'PEAD', 'P03']:
+                'quintili', 'decili', 'ED01', 'ED02', 'PEAA', 'PEAD', 'P03',
+                'B10', 'B11', 'B28', 'TAMA_PEA']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
@@ -144,6 +186,35 @@ def load_reg02(year):
         df['condact'] = df['PEAA'].map({1.0: 1, 2.0: 2, 3.0: 3})
     else:
         df['condact'] = np.nan
+
+    # ruc: tenencia de RUC en el establecimiento (B28: 1=Sí, 2=No sabe, 6=No)
+    if 'B28' in df.columns:
+        df['ruc'] = df['B28'].map({1.0: 1, 2.0: 2, 6.0: 6})
+    else:
+        df['ruc'] = np.nan
+
+    # tama_emp: tamaño del establecimiento categorizado desde TAMA_PEA
+    def _code_tama(x):
+        if pd.isna(x) or x <= 0:
+            return np.nan
+        if x == 1:   return 1   # 1 persona
+        if x <= 5:   return 2   # 2-5 personas
+        if x <= 20:  return 3   # 6-20 personas
+        if x <= 100: return 4   # 21-100 personas
+        return 5                 # 101+ personas
+    if 'TAMA_PEA' in df.columns:
+        df['tama_emp'] = df['TAMA_PEA'].apply(_code_tama)
+    else:
+        df['tama_emp'] = np.nan
+
+    # cotiza_ips: 1=Cotiza a IPS, 2=Cotiza a otra caja, 6=No cotiza
+    if 'B10' in df.columns and 'B11' in df.columns:
+        df['cotiza_ips'] = np.nan
+        df.loc[df['B11'] == 1.0, 'cotiza_ips'] = 1
+        df.loc[(df['B10'] == 1.0) & (df['B11'].notna()) & (df['B11'] != 1.0), 'cotiza_ips'] = 2
+        df.loc[df['B10'] == 6.0, 'cotiza_ips'] = 6
+    else:
+        df['cotiza_ips'] = np.nan
 
     print(f"    {len(df)} rows, weight col: FACTOR, mean={df['FACTOR'].mean():.1f}")
     return df
@@ -640,6 +711,64 @@ def compute_housing(reg01):
     return {"indicators": indicators}
 
 
+def compute_formality(reg02):
+    print("  Computing formality indicators...")
+    indicators = {}
+
+    occ = reg02[reg02['CATE_PEA'].isin([1, 2, 3, 4, 5, 6])].copy()
+
+    # Formality rate: among non-agricultural occupied (informalidad defined)
+    occ_non_agro = occ[occ['informalidad'].isin([1, 2])].copy()
+    indicators['formality_rate'] = {
+        'label': 'Tasa de formalidad (no agro)', 'unit': '%',
+        'data': aggregate(occ_non_agro, lambda s: weighted_pct(s, s['informalidad'] == 2),
+                          FORMALITY_DIMS, FORMALITY_CROSS_2D, FORMALITY_CROSS_3D)
+    }
+    indicators['informality_rate'] = {
+        'label': 'Tasa de informalidad (no agro)', 'unit': '%',
+        'data': aggregate(occ_non_agro, lambda s: weighted_pct(s, s['informalidad'] == 1),
+                          FORMALITY_DIMS, FORMALITY_CROSS_2D, FORMALITY_CROSS_3D)
+    }
+
+    # IPS contribution rates: among occupied with pension response
+    occ_ips = occ[occ['cotiza_ips'].notna()].copy()
+    indicators['ips_rate'] = {
+        'label': 'Cotiza a IPS', 'unit': '%',
+        'data': aggregate(occ_ips, lambda s: weighted_pct(s, s['cotiza_ips'] == 1),
+                          FORMALITY_DIMS, FORMALITY_CROSS_2D, FORMALITY_CROSS_3D)
+    }
+    indicators['otra_caja_rate'] = {
+        'label': 'Cotiza a otra caja', 'unit': '%',
+        'data': aggregate(occ_ips, lambda s: weighted_pct(s, s['cotiza_ips'] == 2),
+                          FORMALITY_DIMS, FORMALITY_CROSS_2D, FORMALITY_CROSS_3D)
+    }
+    indicators['no_cotiza_rate'] = {
+        'label': 'No cotiza a ninguna caja', 'unit': '%',
+        'data': aggregate(occ_ips, lambda s: weighted_pct(s, s['cotiza_ips'] == 6),
+                          FORMALITY_DIMS, FORMALITY_CROSS_2D, FORMALITY_CROSS_3D)
+    }
+
+    # RUC rates: among occupied with RUC response
+    occ_ruc = occ[occ['ruc'].notna()].copy()
+    indicators['ruc_has_rate'] = {
+        'label': 'Establecimiento con RUC', 'unit': '%',
+        'data': aggregate(occ_ruc, lambda s: weighted_pct(s, s['ruc'] == 1),
+                          FORMALITY_DIMS, FORMALITY_CROSS_2D, FORMALITY_CROSS_3D)
+    }
+    indicators['ruc_no_rate'] = {
+        'label': 'Establecimiento sin RUC', 'unit': '%',
+        'data': aggregate(occ_ruc, lambda s: weighted_pct(s, s['ruc'] == 6),
+                          FORMALITY_DIMS, FORMALITY_CROSS_2D, FORMALITY_CROSS_3D)
+    }
+    indicators['ruc_unknown_rate'] = {
+        'label': 'No sabe si tiene RUC', 'unit': '%',
+        'data': aggregate(occ_ruc, lambda s: weighted_pct(s, s['ruc'] == 2),
+                          FORMALITY_DIMS, FORMALITY_CROSS_2D, FORMALITY_CROSS_3D)
+    }
+
+    return {"indicators": indicators}
+
+
 def compute_demographics(reg02):
     print("  Computing demographics indicators...")
     indicators = {}
@@ -740,6 +869,23 @@ def write_metadata(reg02):
             "2": "Desocupado/a",
             "3": "Inactivo/a"
         },
+        "ruc": {
+            "1": "Tiene RUC",
+            "2": "No sabe",
+            "6": "Sin RUC"
+        },
+        "tama_emp": {
+            "1": "1 persona",
+            "2": "2-5 personas",
+            "3": "6-20 personas",
+            "4": "21-100 personas",
+            "5": "Más de 100"
+        },
+        "cotiza_ips": {
+            "1": "Cotiza a IPS",
+            "2": "Otra caja",
+            "6": "No cotiza"
+        },
         "ipc": {
             "base_year": 2022,
             "note": "IPC promedio anual Paraguay, base 2022=100. Fuente: BCP.",
@@ -806,6 +952,9 @@ def main():
     reg01 = pd.concat(reg01_frames, ignore_index=True)
     print(f"  Total REG01: {len(reg01)} rows")
 
+    # Fill dynamic DPTO values for FORMALITY_DIMS too
+    FORMALITY_DIMS['dpto']['values'] = [int(d) for d in dpto_vals]
+
     print("\nComputing indicators...")
     save_json(compute_poverty(reg02), "poverty.json")
     save_json(compute_employment(reg02), "employment.json")
@@ -813,6 +962,7 @@ def main():
     save_json(compute_education(reg02), "education.json")
     save_json(compute_housing(reg01), "housing.json")
     save_json(compute_demographics(reg02), "demographics.json")
+    save_json(compute_formality(reg02), "formality.json")
 
     write_metadata(reg02)
     prepare_geojson()

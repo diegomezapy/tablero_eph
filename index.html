@@ -78,6 +78,23 @@
         <select id="filter-rama_pea" class="form-select form-select-sm"></select>
       </div>
 
+      <hr class="my-2">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--primary);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.5px">
+        <i class="bi bi-building me-1"></i>Características empresa
+      </div>
+      <div class="filter-group">
+        <label for="filter-ruc">Tenencia de RUC</label>
+        <select id="filter-ruc" class="form-select form-select-sm"></select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-tama_emp">Tamaño de empresa</label>
+        <select id="filter-tama_emp" class="form-select form-select-sm"></select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-cotiza_ips">Cotiza a IPS</label>
+        <select id="filter-cotiza_ips" class="form-select form-select-sm"></select>
+      </div>
+
     </aside>
 
     <!-- Main Content -->
@@ -168,6 +185,11 @@
         <li class="nav-item">
           <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-wages" data-theme="wages">
             <i class="bi bi-graph-up-arrow me-1"></i>Trayectorias Salariales
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-formality" data-theme="formality">
+            <i class="bi bi-patch-check me-1"></i>Formalidad
           </button>
         </li>
       </ul>
@@ -409,6 +431,79 @@
               <div class="chart-card">
                 <h6>Brecha salarial por edad (Hombre / Mujer, <span id="wage-gap-year">2025</span>)</h6>
                 <div class="chart-container" style="height:300px"><canvas id="chart-wage-gap"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FORMALITY TAB -->
+        <div class="tab-pane fade" id="tab-formality">
+          <!-- Mini KPI row -->
+          <div class="row g-2 mb-3">
+            <div class="col-6 col-lg-3">
+              <div class="kpi-card" id="fkpi-formality">
+                <div class="kpi-label">Tasa de Formalidad</div>
+                <div class="kpi-value">--</div>
+                <div class="kpi-trend-container"></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="kpi-card" id="fkpi-ips">
+                <div class="kpi-label">Cobertura IPS</div>
+                <div class="kpi-value">--</div>
+                <div class="kpi-trend-container"></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="kpi-card" id="fkpi-ruc">
+                <div class="kpi-label">Establec. con RUC</div>
+                <div class="kpi-value">--</div>
+                <div class="kpi-trend-container"></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="kpi-card" id="fkpi-nocotiza">
+                <div class="kpi-label">Sin cobertura previsional</div>
+                <div class="kpi-value">--</div>
+                <div class="kpi-trend-container"></div>
+              </div>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <div class="chart-card">
+                <h6>Evolución formalidad e informalidad 2022-2025</h6>
+                <div class="chart-container" style="height:280px"><canvas id="chart-formality-evolution"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="chart-card">
+                <h6>Composición de la cobertura previsional</h6>
+                <div class="chart-container" style="height:280px"><canvas id="chart-ips-donut"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Formalidad por tamaño de empresa</h6>
+                <div class="chart-container" style="height:280px"><canvas id="chart-formality-tama"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Tenencia de RUC del establecimiento</h6>
+                <div class="chart-container" style="height:280px"><canvas id="chart-ruc-donut"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Formalidad por rama de actividad</h6>
+                <div class="chart-container" style="height:350px"><canvas id="chart-formality-rama"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="chart-card">
+                <h6>Formalidad y cobertura IPS por categoría ocupacional</h6>
+                <div class="chart-container" style="height:350px"><canvas id="chart-formality-cate"></canvas></div>
               </div>
             </div>
           </div>

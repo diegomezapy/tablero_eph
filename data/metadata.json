@@ -68,6 +68,23 @@
     "2": "Desocupado/a",
     "3": "Inactivo/a"
   },
+  "ruc": {
+    "1": "Tiene RUC",
+    "2": "No sabe",
+    "6": "Sin RUC"
+  },
+  "tama_emp": {
+    "1": "1 persona",
+    "2": "2-5 personas",
+    "3": "6-20 personas",
+    "4": "21-100 personas",
+    "5": "Más de 100"
+  },
+  "cotiza_ips": {
+    "1": "Cotiza a IPS",
+    "2": "Otra caja",
+    "6": "No cotiza"
+  },
   "ipc": {
     "base_year": 2022,
     "note": "IPC promedio anual Paraguay, base 2022=100. Fuente: BCP.",

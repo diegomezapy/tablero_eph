@@ -115,6 +115,9 @@ async function onTabChange(theme) {
       if (map) map.invalidateSize();
     }, 100);
   }
+  if (theme === 'formality') {
+    updateFormalityKPIs();
+  }
 }
 
 function buildSelect(id, entries) {
@@ -137,9 +140,13 @@ function populateFilters(metadata) {
   if (metadata.condact)       buildSelect('filter-condact', Object.entries(metadata.condact));
   if (metadata.cate_pea)      buildSelect('filter-cate_pea', Object.entries(metadata.cate_pea));
   if (metadata.rama_pea)      buildSelect('filter-rama_pea', Object.entries(metadata.rama_pea));
+  if (metadata.ruc)           buildSelect('filter-ruc', Object.entries(metadata.ruc));
+  if (metadata.tama_emp)      buildSelect('filter-tama_emp', Object.entries(metadata.tama_emp));
+  if (metadata.cotiza_ips)    buildSelect('filter-cotiza_ips', Object.entries(metadata.cotiza_ips));
 
   // Convert all filter selects to custom multi-select widgets
-  ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea'].forEach(dim => {
+  ['dpto', 'area', 'sex', 'age_group', 'poverty', 'condact', 'cate_pea', 'rama_pea',
+   'ruc', 'tama_emp', 'cotiza_ips'].forEach(dim => {
     const sel = document.getElementById(`filter-${dim}`);
     if (sel) makeMultiSelectWidget(sel, dim);
   });
@@ -163,6 +170,7 @@ async function init() {
       loadTheme('education'),
       loadTheme('housing'),
       loadTheme('demographics'),
+      loadTheme('formality'),
     ]);
 
     // Filter events are wired inside makeMultiSelectWidget (called from populateFilters)
